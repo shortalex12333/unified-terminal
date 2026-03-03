@@ -6,7 +6,7 @@ Electron desktop app wrapping CLI AI tools (ChatGPT, GSD, Claude Code, Codex) fo
 
 ## Current Status (2026-03-03)
 
-**ALL 16 GATES COMPLETE + CONDUCTOR SYSTEM** — Backend infrastructure built, tested, verified.
+**ALL 17 GATES COMPLETE + CONDUCTOR SYSTEM** — Backend infrastructure built, tested, verified.
 
 **Conductor System Status:** ✅ COMPLETE (9 new files, 295+ tests, all verified)
 
@@ -26,8 +26,9 @@ Electron desktop app wrapping CLI AI tools (ChatGPT, GSD, Claude Code, Codex) fo
 | 12 | ✅ | Auto-updater framework |
 | 13 | ✅ | Error recovery system |
 | 14 | ✅ | Packaging (.dmg unsigned) |
-| 15 | ✅ | **Gemini CLI OAuth** (NEW) |
-| 16 | ✅ | **Auth Screen Component** (NEW) |
+| 15 | ✅ | Gemini CLI OAuth |
+| 16 | ✅ | Auth Screen Component |
+| 17 | ✅ | **Chrome-style ProfilePicker + Provider UX** (NEW) |
 
 ## Test Results
 
@@ -101,10 +102,17 @@ src/
 ├── utils/
 │   └── dom-selectors.ts     # ChatGPT DOM selectors
 │
-└── renderer/
+└── renderer/                # React frontend (Gate 17)
+    ├── index.tsx            # React entry point
+    ├── index.html           # HTML template
+    ├── styles.css           # Tailwind CSS imports
     ├── global.d.ts          # Window.electronAPI types
     └── components/
-        └── AuthScreen.tsx   # CLI auth UI (Gates 15-16)
+        ├── App.tsx              # Root component with state
+        ├── ProfilePicker.tsx    # Chrome-style provider picker
+        ├── ChatInterface.tsx    # Unified chat UI for all providers
+        ├── AuthScreen.tsx       # CLI auth UI (legacy)
+        └── ProviderScreen.tsx   # Provider selection (legacy)
 
 tests/                       # Test files (12 files, 444+ tests)
 ├── task-router.test.ts      # 38 tests
@@ -172,8 +180,11 @@ npx ts-node tests/*.ts   # Run tests
 - ✅ **CONDUCTOR: IPC handlers for step progress**
 - ✅ **CLI AUTH: Codex OAuth flow**
 - ✅ **CLI AUTH: Claude Code OAuth flow**
-- ✅ **CLI AUTH: Gemini OAuth flow** (NEW)
-- ✅ **CLI AUTH: AuthScreen component** (NEW)
+- ✅ **CLI AUTH: Gemini OAuth flow**
+- ✅ **CLI AUTH: AuthScreen component**
+- ✅ **PROFILE PICKER: Chrome-style provider selection** (NEW)
+- ✅ **CHAT INTERFACE: Unified CLI chat for ChatGPT/Gemini/Claude** (NEW)
+- ✅ **REACT RENDERER: Vite + Tailwind CSS frontend** (NEW)
 
 ## What's Deferred
 
