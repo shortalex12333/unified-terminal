@@ -1,0 +1,58 @@
+appId: com.unified-terminal.app
+productName: Unified Terminal
+copyright: Copyright © 2026
+
+directories:
+  output: release
+  buildResources: build
+
+files:
+  - dist/**/*
+  - package.json
+
+# macOS configuration
+mac:
+  category: public.app-category.developer-tools
+  target:
+    - target: dmg
+      arch:
+        - arm64
+    # ZIP is required for auto-updater on macOS
+    - target: zip
+      arch:
+        - arm64
+  icon: build/icon.icns
+  # Skip code signing for development builds
+  identity: null
+  hardenedRuntime: false
+  gatekeeperAssess: false
+  notarize: false
+
+dmg:
+  background: build/dmg-background.png
+  icon: build/icon.icns
+  iconSize: 80
+  window:
+    width: 540
+    height: 380
+  contents:
+    - x: 130
+      y: 186
+      type: file
+    - x: 410
+      y: 186
+      type: link
+      path: /Applications
+
+# GitHub Releases for auto-updates
+# Set GH_OWNER and GH_REPO environment variables or edit values below
+publish:
+  provider: github
+  owner: ${GH_OWNER:-YOUR_GITHUB_USERNAME}
+  repo: ${GH_REPO:-unified-terminal}
+  private: false
+  releaseType: release
+
+# Placeholder for code signing
+# Uncomment afterSign when ready for notarization
+# afterSign: scripts/notarize.js
