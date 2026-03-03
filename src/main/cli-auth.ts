@@ -292,6 +292,38 @@ export async function checkAllAuthStatus(): Promise<AuthStatus[]> {
   return Promise.all(tools.map(tool => isAuthenticated(tool)));
 }
 
+/**
+ * Sign out from a tool by removing its token files
+ */
+export async function signOut(tool: CLITool): Promise<{ success: boolean; error?: string }> {
+  const homeDir = os.homedir();
+  const paths = TOKEN_PATHS[tool];
+
+  let removedAny = false;
+  const errors: string[] = [];
+
+  for (const relativePath of paths) {
+    const fullPath = path.join(homeDir, relativePath);
+
+    try {
+      if (fs.existsSync(fullPath)) {
+        await fs.promises.unlink(fullPath);
+        console.log(`[CLI Auth] Removed token file: ${fullPath}`);
+        removedAny = true;
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      errors.push(`Failed to remove ${relativePath}: ${msg}`);
+    }
+  }
+
+  if (errors.length > 0) {
+    return { success: removedAny, error: errors.join('; ') };
+  }
+
+  return { success: true };
+}
+
 // ============================================================================
 // COMMAND EXISTENCE CHECK
 // ============================================================================

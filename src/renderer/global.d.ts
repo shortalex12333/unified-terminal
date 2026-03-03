@@ -23,6 +23,18 @@ interface AuthProgress {
 }
 
 // ============================================================================
+// CLI OUTPUT TYPES
+// ============================================================================
+
+interface CLIOutputData {
+  provider: string;
+  chunk: string;
+  done: boolean;
+  exitCode?: number;
+  error?: string;
+}
+
+// ============================================================================
 // WINDOW API INTERFACE
 // ============================================================================
 
@@ -34,11 +46,17 @@ interface ElectronAPI {
   auth: {
     checkAll: () => Promise<AuthStatus[]>;
     authenticate: (tool: string) => Promise<{ success: boolean; error?: string }>;
+    signOut: (tool: string) => Promise<{ success: boolean; error?: string }>;
     onProgress: (cb: (data: AuthProgress) => void) => () => void;
   };
 
+  // Background CLI methods for spawning CLI tools invisibly
+  cli: {
+    send: (provider: string, message: string) => Promise<void>;
+    onOutput: (cb: (data: CLIOutputData) => void) => () => void;
+  };
+
   // Additional methods from preload.ts can be added here as needed
-  // For now, only auth is typed for the AuthStatus panel
 }
 
 declare global {

@@ -62,9 +62,11 @@ import {
   setMainWindow,
   isAuthenticated,
   checkAllAuthStatus,
+  signOut,
   AuthStatus,
   CLITool,
 } from './cli-auth';
+import { backgroundCLI, Provider } from './background-cli';
 import {
   TaskRouter,
   getTaskRouter,
@@ -1903,6 +1905,36 @@ ipcMain.handle('conductor:user-decision', async (
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send('step:user-decision', { stepId, decision });
   }
+});
+
+// ============================================================================
+// BACKGROUND CLI IPC HANDLERS (Gate 17)
+// ============================================================================
+
+/**
+ * IPC: Send message to CLI provider
+ */
+ipcMain.handle('cli:send', async (
+  _event,
+  provider: Provider,
+  message: string
+): Promise<void> => {
+  console.log(`[IPC] cli:send called: ${provider}`);
+  if (mainWindow) {
+    backgroundCLI.setMainWindow(mainWindow);
+  }
+  await backgroundCLI.send(provider, message);
+});
+
+/**
+ * IPC: Sign out from a CLI provider
+ */
+ipcMain.handle('auth:sign-out', async (
+  _event,
+  tool: CLITool
+): Promise<{ success: boolean; error?: string }> => {
+  console.log(`[IPC] auth:sign-out called: ${tool}`);
+  return signOut(tool);
 });
 
 // ============================================================================

@@ -681,6 +681,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
     },
 
     /**
+     * Sign out from a CLI tool (removes token files)
+     */
+    signOut: (tool: string): Promise<{ success: boolean; error?: string }> => {
+      return ipcRenderer.invoke('auth:sign-out', tool);
+    },
+
+    /**
      * Listen for auth progress events (prompts and results)
      * Returns a cleanup function to remove listeners
      */
@@ -695,6 +702,36 @@ contextBridge.exposeInMainWorld('electronAPI', {
       return () => {
         ipcRenderer.removeListener('cli:auth-prompt', promptHandler);
         ipcRenderer.removeListener('cli:auth-result', resultHandler);
+      };
+    },
+  },
+
+  // ============================================================================
+  // BACKGROUND CLI METHODS (Background CLI Runner)
+  // ============================================================================
+
+  /**
+   * Background CLI API for spawning CLI tools invisibly and piping output to IPC
+   */
+  cli: {
+    /**
+     * Send a message to a CLI provider (codex, claude-code, gemini)
+     * @param provider - The CLI provider to use
+     * @param message - The message to send
+     */
+    send: (provider: string, message: string): Promise<void> => {
+      return ipcRenderer.invoke('cli:send', provider, message);
+    },
+
+    /**
+     * Listen for CLI output events
+     * Returns a cleanup function to remove the listener
+     */
+    onOutput: (cb: (data: { provider: string; chunk: string; done: boolean; exitCode?: number; error?: string }) => void): (() => void) => {
+      const handler = (_event: IpcRendererEvent, data: { provider: string; chunk: string; done: boolean; exitCode?: number; error?: string }) => cb(data);
+      ipcRenderer.on('cli:output', handler);
+      return () => {
+        ipcRenderer.removeAllListeners('cli:output');
       };
     },
   },
