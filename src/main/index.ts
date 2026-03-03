@@ -67,6 +67,7 @@ import {
   CLITool,
 } from './cli-auth';
 import { backgroundCLI, Provider } from './background-cli';
+import { setupCLIProviderIPC, setMainWindow as setProviderMainWindow } from './cli-provider-manager';
 import {
   TaskRouter,
   getTaskRouter,
@@ -163,10 +164,26 @@ import { installInterceptor, setupInterceptorIPC } from './send-interceptor';
 // CONSTANTS
 // ============================================================================
 
-const CHATGPT_URL = 'https://chatgpt.com';
 const WINDOW_WIDTH = 1400;
 const WINDOW_HEIGHT = 900;
-const SESSION_PARTITION = 'persist:chatgpt';
+
+// Provider URLs - ALL providers use BrowserView with their official websites
+type ProviderType = 'chatgpt' | 'gemini' | 'claude';
+const PROVIDER_URLS: Record<ProviderType, string> = {
+  chatgpt: 'https://chatgpt.com',
+  gemini: 'https://gemini.google.com',
+  claude: 'https://claude.ai',
+};
+
+// Session partitions - each provider gets isolated cookies/storage
+const SESSION_PARTITIONS: Record<ProviderType, string> = {
+  chatgpt: 'persist:chatgpt',
+  gemini: 'persist:gemini',
+  claude: 'persist:claude',
+};
+
+// Currently active provider
+let activeProvider: ProviderType | null = null;
 
 // OAuth domains that should open in popup windows
 const OAUTH_DOMAINS = [
@@ -220,14 +237,15 @@ if (!gotTheLock) {
 // ============================================================================
 
 /**
- * Configure the persistent session for ChatGPT.
- * This session stores cookies and localStorage across app restarts.
+ * Configure the persistent session for a provider.
+ * Each provider gets isolated cookies/storage across app restarts.
  */
-function configureSession(): Electron.Session {
-  const chatGPTSession = session.fromPartition(SESSION_PARTITION, { cache: true });
+function configureSession(provider: ProviderType = 'chatgpt'): Electron.Session {
+  const partition = SESSION_PARTITIONS[provider];
+  const providerSession = session.fromPartition(partition, { cache: true });
 
   // Set up permission handler for clipboard and notifications
-  chatGPTSession.setPermissionRequestHandler(
+  providerSession.setPermissionRequestHandler(
     (
       webContents,
       permission: string,
@@ -252,7 +270,7 @@ function configureSession(): Electron.Session {
   );
 
   // Set up permission check handler
-  chatGPTSession.setPermissionCheckHandler(
+  providerSession.setPermissionCheckHandler(
     (
       webContents,
       permission: string,
@@ -270,7 +288,7 @@ function configureSession(): Electron.Session {
     }
   );
 
-  return chatGPTSession;
+  return providerSession;
 }
 
 // ============================================================================
@@ -285,12 +303,45 @@ function isOAuthURL(url: string): boolean {
     const urlObj = new URL(url);
     const hostname = urlObj.hostname;
     const fullPath = hostname + urlObj.pathname;
-    
-    return OAUTH_DOMAINS.some(domain => 
-      hostname === domain || 
+
+    return OAUTH_DOMAINS.some(domain =>
+      hostname === domain ||
       hostname.endsWith('.' + domain) ||
       fullPath.startsWith(domain)
     );
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Check if a URL indicates user has logged out (login/auth pages).
+ * When detected, we should return to ProfilePicker.
+ */
+function isLogoutURL(url: string): boolean {
+  try {
+    const urlObj = new URL(url);
+    const pathname = urlObj.pathname.toLowerCase();
+    const hostname = urlObj.hostname.toLowerCase();
+
+    // ChatGPT/OpenAI logout indicators
+    if (hostname.includes('chatgpt.com') || hostname.includes('openai.com')) {
+      if (
+        pathname.includes('/auth') ||
+        pathname.includes('/login') ||
+        pathname.includes('/logout') ||
+        pathname === '/' && urlObj.search.includes('logout')
+      ) {
+        return true;
+      }
+    }
+
+    // Auth provider pages (user was redirected to login)
+    if (hostname.includes('auth0.com') || hostname === 'auth.openai.com') {
+      return true;
+    }
+
+    return false;
   } catch {
     return false;
   }
@@ -307,7 +358,7 @@ function createOAuthPopup(url: string, parentWindow: BrowserWindow): BrowserWind
     modal: false,
     show: true,
     webPreferences: {
-      partition: SESSION_PARTITION,
+      partition: SESSION_PARTITIONS[activeProvider || 'chatgpt'],
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: true,
@@ -381,12 +432,13 @@ function handleOAuthNavigation(popup: BrowserWindow, url: string): void {
 // ============================================================================
 
 /**
- * Create and configure the BrowserView for ChatGPT.
+ * Create and configure the BrowserView for a provider.
  */
-function createChatGPTView(parentWindow: BrowserWindow, chatGPTSession: Electron.Session): BrowserView {
+function createProviderView(parentWindow: BrowserWindow, provider: ProviderType): BrowserView {
+  const partition = SESSION_PARTITIONS[provider];
   const view = new BrowserView({
     webPreferences: {
-      partition: SESSION_PARTITION,
+      partition: partition,
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: true,
@@ -458,6 +510,25 @@ function createChatGPTView(parentWindow: BrowserWindow, chatGPTSession: Electron
     }
   });
 
+  // Detect logout: When user logs out in ChatGPT, navigate back to ProfilePicker
+  view.webContents.on('did-navigate', (event, url) => {
+    if (isLogoutURL(url)) {
+      console.log('[ChatGPT View] Logout detected, notifying renderer');
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('provider:logout-detected', 'chatgpt');
+      }
+    }
+  });
+
+  view.webContents.on('did-navigate-in-page', (event, url) => {
+    if (isLogoutURL(url)) {
+      console.log('[ChatGPT View] Logout detected (in-page), notifying renderer');
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('provider:logout-detected', 'chatgpt');
+      }
+    }
+  });
+
   view.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL) => {
     console.error('[ChatGPT View] Failed to load:', validatedURL, errorCode, errorDescription);
   });
@@ -467,7 +538,10 @@ function createChatGPTView(parentWindow: BrowserWindow, chatGPTSession: Electron
 
 /**
  * Update BrowserView bounds to match window size.
+ * Leaves space at bottom for navigation bar (Switch AI button).
  */
+const NAV_BAR_HEIGHT = 56; // Height reserved for our navigation overlay
+
 function updateViewBounds(window: BrowserWindow, view: BrowserView): void {
   const contentBounds = window.getContentBounds();
   const windowBounds = window.getBounds();
@@ -476,13 +550,16 @@ function updateViewBounds(window: BrowserWindow, view: BrowserView): void {
   const width = contentBounds.width > 0 ? contentBounds.width : windowBounds.width;
   const height = contentBounds.height > 0 ? contentBounds.height : windowBounds.height;
 
-  console.log(`[BrowserView] Setting bounds: ${width}x${height}`);
+  // Leave space at bottom for our navigation bar
+  const viewHeight = height - NAV_BAR_HEIGHT;
+
+  console.log(`[BrowserView] Setting bounds: ${width}x${viewHeight} (nav bar: ${NAV_BAR_HEIGHT}px)`);
 
   view.setBounds({
     x: 0,
     y: 0,
     width: width,
-    height: height,
+    height: viewHeight,
   });
 }
 
@@ -533,9 +610,8 @@ function createMainWindow(): void {
     console.log('[App] Loading React app from built files');
   }
 
-  // Create the ChatGPT BrowserView (initially hidden, shown when user selects ChatGPT web mode)
-  chatGPTView = createChatGPTView(mainWindow, chatGPTSession);
-  // Don't set BrowserView initially - let React app handle the UI
+  // BrowserView will be created when user selects a provider
+  // Don't create it initially - ProfilePicker handles provider selection
 
   // Handle window close
   mainWindow.on('closed', () => {
@@ -571,6 +647,12 @@ app.whenReady().then(() => {
   setupCliAuthIPC(() => mainWindow);
   if (mainWindow) {
     setMainWindow(mainWindow);
+  }
+
+  // Set up CLI provider manager IPC handlers (Gate 17 - Isolated Provider Auth)
+  setupCLIProviderIPC(() => mainWindow);
+  if (mainWindow) {
+    setProviderMainWindow(mainWindow);
   }
 
   // Initialize plugin system (Gate 10)
@@ -1910,58 +1992,65 @@ ipcMain.handle('cli:send', async (
 });
 
 // ============================================================================
-// CHATGPT BROWSERVIEW IPC HANDLERS (Provider-specific routing)
+// PROVIDER BROWSERVIEW IPC HANDLERS
 // ============================================================================
 
 /**
- * IPC: Show the ChatGPT BrowserView (for ChatGPT provider)
- * Attaches the BrowserView to the main window and makes it visible
+ * IPC: Show the BrowserView for a provider
+ * Creates a new BrowserView (if needed), loads the provider's URL
  */
-ipcMain.handle('chatgpt:show-view', async (): Promise<{ success: boolean; error?: string }> => {
-  console.log('[IPC] chatgpt:show-view called');
+ipcMain.handle('provider:show-view', async (
+  _event,
+  provider: ProviderType
+): Promise<{ success: boolean; error?: string }> => {
+  console.log(`[IPC] provider:show-view called for ${provider}`);
 
   if (!mainWindow || mainWindow.isDestroyed()) {
     return { success: false, error: 'Main window not available' };
   }
 
-  if (!chatGPTView) {
-    return { success: false, error: 'ChatGPT view not initialized' };
+  if (!PROVIDER_URLS[provider]) {
+    return { success: false, error: `Unknown provider: ${provider}` };
   }
 
   try {
+    // Create new BrowserView for this provider
+    chatGPTView = createProviderView(mainWindow, provider);
+    activeProvider = provider;
+
     // Attach BrowserView to window
     mainWindow.setBrowserView(chatGPTView);
 
-    // Update bounds to fill the window
+    // Update bounds to fill the window (leaving space for nav bar)
     updateViewBounds(mainWindow, chatGPTView);
 
     // Listen for window resize to update bounds
-    mainWindow.on('resize', () => {
+    const resizeHandler = () => {
       if (chatGPTView && mainWindow && !mainWindow.isDestroyed()) {
         updateViewBounds(mainWindow, chatGPTView);
       }
-    });
+    };
+    mainWindow.removeAllListeners('resize');
+    mainWindow.on('resize', resizeHandler);
 
-    // Load ChatGPT if not already loaded
-    const currentURL = chatGPTView.webContents.getURL();
-    if (!currentURL || !currentURL.includes('chatgpt.com')) {
-      console.log('[ChatGPT View] Loading ChatGPT...');
-      await chatGPTView.webContents.loadURL(CHATGPT_URL);
-    }
+    // Load the provider's URL
+    const url = PROVIDER_URLS[provider];
+    console.log(`[Provider View] Loading ${provider}: ${url}`);
+    await chatGPTView.webContents.loadURL(url);
 
     return { success: true };
   } catch (error) {
-    console.error('[IPC] chatgpt:show-view error:', error);
+    console.error(`[IPC] provider:show-view error:`, error);
     return { success: false, error: String(error) };
   }
 });
 
 /**
- * IPC: Hide the ChatGPT BrowserView (when switching to CLI providers)
- * Removes the BrowserView from the main window
+ * IPC: Hide the provider BrowserView
+ * Removes and destroys the BrowserView
  */
-ipcMain.handle('chatgpt:hide-view', async (): Promise<{ success: boolean }> => {
-  console.log('[IPC] chatgpt:hide-view called');
+ipcMain.handle('provider:hide-view', async (): Promise<{ success: boolean }> => {
+  console.log('[IPC] provider:hide-view called');
 
   if (!mainWindow || mainWindow.isDestroyed()) {
     return { success: false };
@@ -1970,22 +2059,39 @@ ipcMain.handle('chatgpt:hide-view', async (): Promise<{ success: boolean }> => {
   try {
     // Remove BrowserView from window
     mainWindow.setBrowserView(null);
+
+    // Destroy the view to free memory
+    if (chatGPTView && !chatGPTView.webContents.isDestroyed()) {
+      chatGPTView.webContents.close();
+    }
+    chatGPTView = null;
+    activeProvider = null;
+
     return { success: true };
   } catch (error) {
-    console.error('[IPC] chatgpt:hide-view error:', error);
+    console.error('[IPC] provider:hide-view error:', error);
     return { success: false };
   }
 });
 
 /**
- * IPC: Check if ChatGPT BrowserView is currently visible
+ * IPC: Get currently active provider
  */
+ipcMain.handle('provider:get-active', async (): Promise<ProviderType | null> => {
+  return activeProvider;
+});
+
+// Legacy handlers for backward compatibility
+ipcMain.handle('chatgpt:show-view', async (): Promise<{ success: boolean; error?: string }> => {
+  return ipcMain.emit('provider:show-view', null, 'chatgpt') as any;
+});
+
+ipcMain.handle('chatgpt:hide-view', async (): Promise<{ success: boolean }> => {
+  return ipcMain.emit('provider:hide-view', null) as any;
+});
+
 ipcMain.handle('chatgpt:is-view-visible', async (): Promise<boolean> => {
-  if (!mainWindow || mainWindow.isDestroyed()) {
-    return false;
-  }
-  const view = mainWindow.getBrowserView();
-  return view === chatGPTView;
+  return activeProvider === 'chatgpt' && chatGPTView !== null;
 });
 
 /**

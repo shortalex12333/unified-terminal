@@ -1,18 +1,37 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState } from 'react';
 
 export type Provider = 'chatgpt' | 'gemini' | 'claude';
 
 interface ProviderProfile {
   id: Provider;
   name: string;
+  description: string;
   color: string;
-  icon: string;
+  logoUrl: string;
 }
 
 const PROVIDERS: ProviderProfile[] = [
-  { id: 'chatgpt', name: 'ChatGPT', color: '#10a37f', icon: '⬡' },
-  { id: 'gemini', name: 'Gemini', color: '#4285f4', icon: '✦' },
-  { id: 'claude', name: 'Claude', color: '#cc785c', icon: '◉' },
+  {
+    id: 'chatgpt',
+    name: 'ChatGPT',
+    description: 'OpenAI',
+    color: '#10a37f',
+    logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/0/04/ChatGPT_logo.svg',
+  },
+  {
+    id: 'gemini',
+    name: 'Gemini',
+    description: 'Google',
+    color: '#4285f4',
+    logoUrl: 'https://www.gstatic.com/lamda/images/gemini_sparkle_v002_d4735304ff6292a690345.svg',
+  },
+  {
+    id: 'claude',
+    name: 'Claude',
+    description: 'Anthropic',
+    color: '#cc785c',
+    logoUrl: 'https://anthropic.com/images/icons/apple-touch-icon.png',
+  },
 ];
 
 interface Props {
@@ -20,146 +39,114 @@ interface Props {
 }
 
 export default function ProfilePicker({ onSelectProvider }: Props) {
-  const [authStatus, setAuthStatus] = useState<Record<Provider, boolean>>({
-    chatgpt: false,
-    gemini: false,
-    claude: false,
-  });
-  const [isLoading, setIsLoading] = useState(true);
-  const [hoveredId, setHoveredId] = useState<Provider | null>(null);
+  const [logoErrors, setLogoErrors] = useState<Record<string, boolean>>({});
+  const [selectedProvider, setSelectedProvider] = useState<Provider | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const checkAuth = useCallback(async () => {
+  const handleLogoError = (providerId: string) => {
+    setLogoErrors(prev => ({ ...prev, [providerId]: true }));
+  };
+
+  const handleSelect = async (provider: Provider) => {
+    setSelectedProvider(provider);
     setIsLoading(true);
+
     try {
-      const statuses = await window.electronAPI?.auth?.checkAll?.();
-
-      // Always initialize with all providers set to false
-      const map: Record<Provider, boolean> = { chatgpt: false, gemini: false, claude: false };
-
-      // Map CLI tools to providers if we got valid statuses
-      if (Array.isArray(statuses)) {
-        statuses.forEach((s: { tool: string; isAuthenticated: boolean }) => {
-          if (s.tool === 'codex') map.chatgpt = s.isAuthenticated;
-          if (s.tool === 'gemini') map.gemini = s.isAuthenticated;
-          if (s.tool === 'claude-code') map.claude = s.isAuthenticated;
-        });
+      // All providers use BrowserView - just tell main process to load the provider
+      const result = await window.electronAPI?.providerView?.show?.(provider);
+      if (result?.success) {
+        onSelectProvider(provider);
+      } else {
+        console.error('[ProfilePicker] Failed to show provider:', result?.error);
+        setSelectedProvider(null);
       }
-
-      setAuthStatus(map);
     } catch (err) {
-      console.error('Auth check failed:', err);
-      // On error, show all providers as not authenticated (allows login attempt)
-      setAuthStatus({ chatgpt: false, gemini: false, claude: false });
+      console.error('[ProfilePicker] Error:', err);
+      setSelectedProvider(null);
     } finally {
       setIsLoading(false);
     }
-  }, []);
-
-  // Check auth on mount and whenever the component is shown
-  useEffect(() => {
-    checkAuth();
-  }, [checkAuth]);
-
-  const handleSelect = async (provider: Provider) => {
-    // If not authenticated, trigger auth flow first
-    if (!authStatus[provider]) {
-      const toolMap: Record<Provider, string> = {
-        chatgpt: 'codex',
-        gemini: 'gemini',
-        claude: 'claude-code',
-      };
-
-      try {
-        await window.electronAPI?.auth?.authenticate?.(toolMap[provider]);
-        await checkAuth();
-      } catch (err) {
-        console.error('Auth failed:', err);
-        return;
-      }
-    }
-
-    onSelectProvider(provider);
   };
 
   return (
-    <div className="h-screen w-screen bg-[#f8f9fa] flex flex-col items-center justify-center relative overflow-hidden">
-      {/* Decorative shapes */}
-      <div className="absolute top-20 left-20 w-12 h-12 border-4 border-[#34a853] rounded-lg rotate-12 opacity-60" />
-      <div className="absolute top-32 right-32 w-8 h-8 bg-[#fbbc04] rounded-full opacity-60" />
-      <div className="absolute bottom-40 left-32 w-6 h-6 bg-[#ea4335] rounded-full opacity-60" />
-      <div className="absolute top-40 left-40 w-4 h-4 bg-[#4285f4] rounded-full opacity-60" />
-      <div className="absolute bottom-32 right-40 w-10 h-10 border-4 border-[#4285f4] rotate-45 opacity-40" />
-      <div className="absolute top-60 right-20 w-0 h-0 border-l-[20px] border-l-transparent border-b-[35px] border-b-[#34a853] border-r-[20px] border-r-transparent opacity-40" />
-
-      {/* Main content */}
-      <div className="z-10 flex flex-col items-center">
-        {/* Logo */}
-        <div className="w-16 h-16 bg-gradient-to-br from-[#4285f4] via-[#34a853] to-[#fbbc04] rounded-2xl flex items-center justify-center mb-6 shadow-lg">
-          <span className="text-white text-3xl font-bold">U</span>
-        </div>
-
-        {/* Title */}
-        <h1 className="text-2xl font-normal text-[#202124] mb-2">
+    <div className="h-screen w-screen bg-gradient-to-br from-slate-50 to-slate-100 flex flex-col items-center justify-center">
+      {/* Header */}
+      <div className="mb-12 text-center">
+        <h1 className="text-3xl font-semibold text-slate-800 mb-2">
           Choose your AI
         </h1>
-        <p className="text-sm text-[#5f6368] mb-10 text-center max-w-md">
-          Select an AI provider to start. Your conversations stay separate.
+        <p className="text-slate-500">
+          Select a provider to get started
         </p>
+      </div>
 
-        {/* Provider cards */}
-        <div className="flex gap-6">
-          {PROVIDERS.map((provider) => (
+      {/* Provider cards */}
+      <div className="flex gap-8">
+        {PROVIDERS.map((provider) => {
+          const isSelected = selectedProvider === provider.id;
+          const logoFailed = logoErrors[provider.id];
+
+          return (
             <button
               key={provider.id}
               onClick={() => handleSelect(provider.id)}
-              onMouseEnter={() => setHoveredId(provider.id)}
-              onMouseLeave={() => setHoveredId(null)}
+              disabled={isLoading}
               className={`
-                flex flex-col items-center p-6 bg-white rounded-2xl
-                transition-all duration-200 cursor-pointer
-                ${hoveredId === provider.id ? 'shadow-xl scale-105' : 'shadow-md'}
-                border border-gray-100 hover:border-gray-200
-                min-w-[140px]
+                group relative flex flex-col items-center p-8 bg-white rounded-2xl
+                transition-all duration-300 cursor-pointer
+                border-2 min-w-[180px]
+                ${isSelected ? 'border-blue-500 shadow-xl scale-105' : 'border-transparent shadow-lg hover:shadow-xl hover:scale-105'}
+                ${isLoading ? 'opacity-70' : ''}
+                disabled:cursor-wait
               `}
             >
-              {/* Provider icon */}
+              {/* Logo */}
               <div
-                className="w-16 h-16 rounded-full flex items-center justify-center mb-4 text-white text-2xl"
-                style={{ backgroundColor: provider.color }}
+                className="w-20 h-20 rounded-2xl flex items-center justify-center mb-4 p-4"
+                style={{ backgroundColor: `${provider.color}15` }}
               >
-                {provider.icon}
+                {logoFailed ? (
+                  <div
+                    className="w-12 h-12 rounded-full flex items-center justify-center text-white text-xl font-bold"
+                    style={{ backgroundColor: provider.color }}
+                  >
+                    {provider.name[0]}
+                  </div>
+                ) : (
+                  <img
+                    src={provider.logoUrl}
+                    alt={provider.name}
+                    className="w-12 h-12 object-contain"
+                    onError={() => handleLogoError(provider.id)}
+                  />
+                )}
               </div>
 
-              {/* Provider name */}
-              <span className="text-sm font-medium text-[#202124]">
+              {/* Name */}
+              <span className="text-lg font-medium text-slate-800 mb-1">
                 {provider.name}
               </span>
 
-              {/* Auth status indicator */}
-              {isLoading ? (
-                <span className="text-xs text-[#5f6368] mt-1">Checking...</span>
-              ) : authStatus[provider.id] ? (
-                <span className="text-xs text-[#34a853] mt-1">● Connected</span>
-              ) : (
-                <span className="text-xs text-[#5f6368] mt-1">Sign in</span>
+              {/* Company */}
+              <span className="text-sm text-slate-400">
+                {provider.description}
+              </span>
+
+              {/* Loading spinner */}
+              {isSelected && isLoading && (
+                <div className="absolute inset-0 flex items-center justify-center bg-white/80 rounded-2xl">
+                  <div className="w-8 h-8 border-3 border-slate-200 border-t-blue-500 rounded-full animate-spin" />
+                </div>
               )}
             </button>
-          ))}
-        </div>
+          );
+        })}
       </div>
 
-      {/* Footer */}
-      <div className="absolute bottom-8 left-8 right-8 flex justify-between items-center">
-        <button className="flex items-center gap-2 px-4 py-2 text-sm text-[#1a73e8] hover:bg-[#e8f0fe] rounded-full transition-colors">
-          <span className="w-5 h-5 bg-[#5f6368] rounded-full flex items-center justify-center text-white text-xs">?</span>
-          Guest mode
-        </button>
-
-        <label className="flex items-center gap-2 text-sm text-[#5f6368] cursor-pointer">
-          <input type="checkbox" defaultChecked className="w-4 h-4 accent-[#1a73e8]" />
-          Show on startup
-        </label>
-      </div>
+      {/* Footer hint */}
+      <p className="mt-12 text-xs text-slate-400 max-w-md text-center">
+        Each provider has its own login. Your conversations are kept separate.
+      </p>
     </div>
   );
 }

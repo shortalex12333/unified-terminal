@@ -707,13 +707,60 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
 
   // ============================================================================
-  // BACKGROUND CLI METHODS (Background CLI Runner)
+  // CLI PROVIDER METHODS (Installation + Authentication for Gemini/Claude)
   // ============================================================================
 
   /**
-   * Background CLI API for spawning CLI tools invisibly and piping output to IPC
+   * CLI API for managing CLI providers (Gemini, Claude)
+   * ChatGPT uses BrowserView web login - NOT this system
    */
   cli: {
+    /**
+     * Check status of all CLI providers (installed + authenticated)
+     * Returns array of { tool, isInstalled, isAuthenticated }
+     */
+    checkAllStatus: (): Promise<{ tool: string; isInstalled: boolean; isAuthenticated: boolean }[]> => {
+      return ipcRenderer.invoke('cli:checkAllStatus');
+    },
+
+    /**
+     * Check status of a specific CLI provider
+     */
+    checkStatus: (provider: string): Promise<{ tool: string; isInstalled: boolean; isAuthenticated: boolean }> => {
+      return ipcRenderer.invoke('cli:checkStatus', provider);
+    },
+
+    /**
+     * Install a CLI provider (npm install -g <package>)
+     * @param provider - 'gemini' or 'claude-code'
+     */
+    install: (provider: string): Promise<{ success: boolean; error?: string }> => {
+      return ipcRenderer.invoke('cli:install', provider);
+    },
+
+    /**
+     * Authenticate with a CLI provider (triggers OAuth flow)
+     * @param provider - 'gemini' or 'claude-code'
+     */
+    authenticate: (provider: string): Promise<{ success: boolean; error?: string }> => {
+      return ipcRenderer.invoke('cli:authenticate', provider);
+    },
+
+    /**
+     * Sign out from a CLI provider (removes token files)
+     * @param provider - 'gemini' or 'claude-code'
+     */
+    signOut: (provider: string): Promise<{ success: boolean; error?: string }> => {
+      return ipcRenderer.invoke('cli:signOut', provider);
+    },
+
+    /**
+     * Cancel an active authentication process
+     */
+    cancelAuth: (provider: string): Promise<boolean> => {
+      return ipcRenderer.invoke('cli:cancelAuth', provider);
+    },
+
     /**
      * Send a message to a CLI provider (codex, claude-code, gemini)
      * @param provider - The CLI provider to use
@@ -734,37 +781,103 @@ contextBridge.exposeInMainWorld('electronAPI', {
         ipcRenderer.removeAllListeners('cli:output');
       };
     },
+
+    /**
+     * Listen for CLI auth output (OAuth prompts, etc.)
+     */
+    onAuthOutput: (cb: (data: { provider: string; output: string }) => void): (() => void) => {
+      const handler = (_event: IpcRendererEvent, data: { provider: string; output: string }) => cb(data);
+      ipcRenderer.on('cli:auth-output', handler);
+      return () => {
+        ipcRenderer.removeAllListeners('cli:auth-output');
+      };
+    },
+
+    /**
+     * Listen for CLI install progress
+     */
+    onInstallProgress: (cb: (data: { provider: string; status: string; message: string }) => void): (() => void) => {
+      const handler = (_event: IpcRendererEvent, data: { provider: string; status: string; message: string }) => cb(data);
+      ipcRenderer.on('cli:install-progress', handler);
+      return () => {
+        ipcRenderer.removeAllListeners('cli:install-progress');
+      };
+    },
   },
 
   // ============================================================================
-  // CHATGPT BROWSERVIEW METHODS (Provider-specific routing)
+  // PROVIDER BROWSERVIEW METHODS (Unified for all providers)
   // ============================================================================
 
   /**
-   * ChatGPT BrowserView API for showing/hiding the embedded ChatGPT web view
+   * Provider BrowserView API - ALL providers (ChatGPT, Gemini, Claude) use BrowserView
+   * Each provider loads their official website for authentication and chat
    */
-  chatgptView: {
+  providerView: {
     /**
-     * Show the ChatGPT BrowserView (for ChatGPT provider)
-     * Attaches the BrowserView and loads chatgpt.com
+     * Show the BrowserView for a provider
+     * Creates BrowserView, loads provider's official website
+     * @param provider - 'chatgpt' | 'gemini' | 'claude'
      */
-    show: (): Promise<{ success: boolean; error?: string }> => {
-      return ipcRenderer.invoke('chatgpt:show-view');
+    show: (provider: string): Promise<{ success: boolean; error?: string }> => {
+      return ipcRenderer.invoke('provider:show-view', provider);
     },
 
     /**
-     * Hide the ChatGPT BrowserView (when switching to CLI providers)
-     * Removes the BrowserView from the window
+     * Hide the provider BrowserView
+     * Removes and destroys the BrowserView
      */
     hide: (): Promise<{ success: boolean }> => {
-      return ipcRenderer.invoke('chatgpt:hide-view');
+      return ipcRenderer.invoke('provider:hide-view');
     },
 
     /**
-     * Check if ChatGPT BrowserView is currently visible
+     * Get currently active provider
+     * Returns null if no provider is active
      */
+    getActive: (): Promise<string | null> => {
+      return ipcRenderer.invoke('provider:get-active');
+    },
+  },
+
+  // ============================================================================
+  // LEGACY: CHATGPT BROWSERVIEW METHODS (for backward compatibility)
+  // ============================================================================
+
+  /**
+   * @deprecated Use providerView.show('chatgpt') instead
+   */
+  chatgptView: {
+    show: (): Promise<{ success: boolean; error?: string }> => {
+      return ipcRenderer.invoke('provider:show-view', 'chatgpt');
+    },
+    hide: (): Promise<{ success: boolean }> => {
+      return ipcRenderer.invoke('provider:hide-view');
+    },
     isVisible: (): Promise<boolean> => {
       return ipcRenderer.invoke('chatgpt:is-view-visible');
+    },
+  },
+
+  // ============================================================================
+  // PROVIDER EVENTS (Logout detection, etc.)
+  // ============================================================================
+
+  /**
+   * Provider event listeners
+   */
+  provider: {
+    /**
+     * Listen for logout detection from any provider.
+     * When a provider's web interface navigates to login page, this fires.
+     * App should return to ProfilePicker when this happens.
+     */
+    onLogoutDetected: (cb: (provider: string) => void): (() => void) => {
+      const handler = (_event: IpcRendererEvent, provider: string) => cb(provider);
+      ipcRenderer.on('provider:logout-detected', handler);
+      return () => {
+        ipcRenderer.removeListener('provider:logout-detected', handler);
+      };
     },
   },
 });
