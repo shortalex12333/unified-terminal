@@ -491,6 +491,11 @@ function updateViewBounds(window: BrowserWindow, view: BrowserView): void {
 // ============================================================================
 
 /**
+ * Check if running in development mode
+ */
+const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
+
+/**
  * Create the main application window.
  */
 function createMainWindow(): void {
@@ -503,53 +508,34 @@ function createMainWindow(): void {
     height: WINDOW_HEIGHT,
     minWidth: 800,
     minHeight: 600,
-    show: true, // Show immediately - BrowserView handles content
-    backgroundColor: '#ffffff',
-    
+    show: true,
+    backgroundColor: '#f8f9fa',
+
     // macOS specific: hidden titlebar with traffic lights
     titleBarStyle: 'hiddenInset',
     trafficLightPosition: { x: 16, y: 16 },
-    
+
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
-      sandbox: true,
+      preload: path.join(__dirname, 'preload.js'),
     },
   });
 
-  // Create the ChatGPT BrowserView
+  // Load the React app (ProfilePicker → ChatInterface flow)
+  if (isDev) {
+    // In development, load from Vite dev server
+    mainWindow.loadURL('http://localhost:3000');
+    console.log('[App] Loading React app from Vite dev server');
+  } else {
+    // In production, load from built renderer
+    mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'));
+    console.log('[App] Loading React app from built files');
+  }
+
+  // Create the ChatGPT BrowserView (initially hidden, shown when user selects ChatGPT web mode)
   chatGPTView = createChatGPTView(mainWindow, chatGPTSession);
-  mainWindow.setBrowserView(chatGPTView);
-
-  // Set initial bounds
-  updateViewBounds(mainWindow, chatGPTView);
-
-  // Update bounds on resize
-  mainWindow.on('resize', () => {
-    if (mainWindow && chatGPTView) {
-      updateViewBounds(mainWindow, chatGPTView);
-    }
-  });
-
-  // Handle maximize/unmaximize
-  mainWindow.on('maximize', () => {
-    if (mainWindow && chatGPTView) {
-      setTimeout(() => updateViewBounds(mainWindow!, chatGPTView!), 0);
-    }
-  });
-
-  mainWindow.on('unmaximize', () => {
-    if (mainWindow && chatGPTView) {
-      setTimeout(() => updateViewBounds(mainWindow!, chatGPTView!), 0);
-    }
-  });
-
-  // Update bounds after a short delay to ensure window is rendered
-  setTimeout(() => {
-    if (mainWindow && chatGPTView) {
-      updateViewBounds(mainWindow, chatGPTView);
-    }
-  }, 100);
+  // Don't set BrowserView initially - let React app handle the UI
 
   // Handle window close
   mainWindow.on('closed', () => {
@@ -564,9 +550,6 @@ function createMainWindow(): void {
     mainWindow = null;
     chatGPTView = null;
   });
-
-  // Load ChatGPT
-  chatGPTView.webContents.loadURL(CHATGPT_URL);
 }
 
 // ============================================================================
