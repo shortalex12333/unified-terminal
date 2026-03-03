@@ -22,7 +22,7 @@ const execFileAsync = promisify(execFile);
 /**
  * Supported CLI tools
  */
-export type CLITool = 'codex' | 'claude-code';
+export type CLITool = 'codex' | 'claude-code' | 'gemini';
 
 /**
  * Types of authentication prompts that CLIs may present
@@ -118,6 +118,12 @@ const AUTH_PATTERNS: Record<CLITool, Record<string, RegExp>> = {
     token: /token|api.key|secret|paste|enter.*key/i,
     question: /\?\s*$|\[y\/n\]|\[yes\/no\]|press enter|confirm/i,
   },
+  gemini: {
+    googleAuth: /google|sign in|accounts\.google|oauth|authorization/i,
+    tos: /terms|accept|agree|continue|y\/n|yes\/no/i,
+    token: /token|api.key|secret|paste|enter.*key/i,
+    question: /\?\s*$|\[y\/n\]|\[yes\/no\]|press enter|confirm/i,
+  },
 };
 
 /**
@@ -145,6 +151,10 @@ const TOKEN_PATHS: Record<CLITool, string[]> = {
     '.claude/config.json',
     '.claude.json',
   ],
+  gemini: [
+    '.gemini/oauth_creds.json',
+    '.gemini/google_accounts.json',
+  ],
 };
 
 /**
@@ -153,14 +163,16 @@ const TOKEN_PATHS: Record<CLITool, string[]> = {
 const CLI_EXECUTABLES: Record<CLITool, string[]> = {
   codex: ['codex', 'npx'],
   'claude-code': ['claude', 'npx'],
+  gemini: ['gemini'],
 };
 
 /**
  * CLI executable arguments when using npx
  */
-const CLI_NPX_PACKAGES: Record<CLITool, string> = {
+const CLI_NPX_PACKAGES: Partial<Record<CLITool, string>> = {
   codex: 'codex',
   'claude-code': '@anthropic-ai/claude-code',
+  // gemini: not used via npx - running `gemini` directly triggers OAuth on first use
 };
 
 // ============================================================================
@@ -276,7 +288,7 @@ export async function isAuthenticated(tool: CLITool): Promise<AuthStatus> {
  * Check authentication status for all tools
  */
 export async function checkAllAuthStatus(): Promise<AuthStatus[]> {
-  const tools: CLITool[] = ['codex', 'claude-code'];
+  const tools: CLITool[] = ['codex', 'claude-code', 'gemini'];
   return Promise.all(tools.map(tool => isAuthenticated(tool)));
 }
 
@@ -310,7 +322,7 @@ function detectPromptType(tool: CLITool, output: string): AuthPromptType | null 
   const patterns = AUTH_PATTERNS[tool];
 
   // Check for OAuth/browser auth first (most specific)
-  if (patterns.githubAuth?.test(output) || patterns.anthropicAuth?.test(output)) {
+  if (patterns.githubAuth?.test(output) || patterns.anthropicAuth?.test(output) || patterns.googleAuth?.test(output)) {
     // Check if it's asking to open a browser
     if (/open|browser|url|http|visit/i.test(output)) {
       return 'oauth';
@@ -440,7 +452,10 @@ export async function startAuthFlow(
   if (useNpx) {
     // Using npx to run the package
     const packageName = CLI_NPX_PACKAGES[tool];
-    cmdArgs = [packageName, 'auth', ...args];
+    cmdArgs = [packageName!, 'auth', ...args];
+  } else if (tool === 'gemini') {
+    // Gemini doesn't have explicit auth command - running `gemini` triggers OAuth on first use
+    cmdArgs = [...args];
   } else {
     // Direct CLI invocation
     cmdArgs = ['auth', ...args];

@@ -6,9 +6,9 @@ Electron desktop app wrapping CLI AI tools (ChatGPT, GSD, Claude Code, Codex) fo
 
 ## Current Status (2026-03-03)
 
-**ALL 14 GATES COMPLETE + CONDUCTOR SYSTEM** — Backend infrastructure built, tested, verified.
+**ALL 16 GATES COMPLETE + CONDUCTOR SYSTEM** — Backend infrastructure built, tested, verified.
 
-**Conductor System Status:** ✅ COMPLETE (9 new files, 238 tests, all verified)
+**Conductor System Status:** ✅ COMPLETE (9 new files, 295+ tests, all verified)
 
 | Gate | Status | Description |
 |------|--------|-------------|
@@ -26,21 +26,24 @@ Electron desktop app wrapping CLI AI tools (ChatGPT, GSD, Claude Code, Codex) fo
 | 12 | ✅ | Auto-updater framework |
 | 13 | ✅ | Error recovery system |
 | 14 | ✅ | Packaging (.dmg unsigned) |
+| 15 | ✅ | **Gemini CLI OAuth** (NEW) |
+| 16 | ✅ | **Auth Screen Component** (NEW) |
 
 ## Test Results
 
-**387+ tests passing:**
+**444+ tests passing:**
 - System Scanner: 15/15
 - Task Router: 38/38
 - Intake: 24/24
 - CLI Runner: 42/42
 - Integration Flow: 24/24
 - Codex Adapter: 6/6
-- **Fast-Path: 92/92** (NEW)
-- **Conductor: 63/63** (NEW)
-- **Step Scheduler: 83/83** (NEW)
+- **Fast-Path: 92/92**
+- **Conductor: 63/63**
+- **Step Scheduler: 83/83**
+- **CLI Auth: 57/57** (NEW - Gemini support)
 
-## Source Files (43 TypeScript files)
+## Source Files (46 TypeScript files)
 
 ```
 src/
@@ -98,9 +101,12 @@ src/
 ├── utils/
 │   └── dom-selectors.ts     # ChatGPT DOM selectors
 │
-└── renderer/                # (empty - UI deferred)
+└── renderer/
+    ├── global.d.ts          # Window.electronAPI types
+    └── components/
+        └── AuthScreen.tsx   # CLI auth UI (Gates 15-16)
 
-tests/                       # Test files (11 files, 387+ tests)
+tests/                       # Test files (12 files, 444+ tests)
 ├── task-router.test.ts      # 38 tests
 ├── intake.test.ts           # 24 tests
 ├── cli-runner.test.ts       # 42 tests
@@ -111,6 +117,7 @@ tests/                       # Test files (11 files, 387+ tests)
 ├── fast-path.test.ts        # 92 tests for Tier 0 bypass
 ├── conductor.test.ts        # 63 tests for Tier 1 router
 ├── step-scheduler.test.ts   # 83 tests for DAG executor
+├── cli-auth.test.ts         # 57 tests for CLI auth (NEW)
 └── integration-check.ts     # Comprehensive system verification
 ```
 
@@ -163,6 +170,10 @@ npx ts-node tests/*.ts   # Run tests
 - ✅ **CONDUCTOR: Persistent Codex session for classification**
 - ✅ **CONDUCTOR: DAG executor with circuit breaker**
 - ✅ **CONDUCTOR: IPC handlers for step progress**
+- ✅ **CLI AUTH: Codex OAuth flow**
+- ✅ **CLI AUTH: Claude Code OAuth flow**
+- ✅ **CLI AUTH: Gemini OAuth flow** (NEW)
+- ✅ **CLI AUTH: AuthScreen component** (NEW)
 
 ## What's Deferred
 
@@ -230,30 +241,34 @@ See: `/docs/BOTTLENECKS/CONDUCTOR-ARCHITECTURE.md`
 
 ## Next Steps
 
-1. ✅ Conductor system built (9 new files, 43 total TypeScript files)
+1. ✅ Conductor system built (9 new files, 46 total TypeScript files)
 2. ✅ Tests written for conductor system (238 tests: fast-path, conductor, step-scheduler)
 3. ✅ App runs full flow: Message → Interceptor → Fast-path → Conductor → Executor
 4. ✅ Session persistence verified (Session ID: 019cb484-9325-73e3-be57-d379cf90cb12)
 5. ✅ Integration test passes: All components operational
-6. ⏳ End-to-end test with real ChatGPT + Codex (manual testing)
+6. ✅ **Gates 15-16: Gemini CLI OAuth + AuthScreen component** (57 new tests)
+7. ⏳ End-to-end test with real ChatGPT + all CLIs (manual testing)
 
 **CONDUCTOR IS COMPLETE** — All acceptance criteria met. See `/docs/ONGOING_WORK/CONDUCTOR /IMPLEMENTATION-PLAN.md`
+**GATES 15-16 COMPLETE** — Gemini OAuth + AuthScreen. See `/docs/ONGOING_WORK/CLI_AUTH/GATE-15-16-CLI-AUTH.md`
 
 ## Key Documentation
 
 ```
 docs/
 ├── BOTTLENECKS/
-│   ├── BOTTLENECKS.md           # 14-gate build plan
+│   ├── BOTTLENECKS.md           # 16-gate build plan
 │   └── CLAUDE-CODE-GATE5-6.md   # Detailed Gate 5-6 spec
 ├── CLAUDE_CODE/
 │   └── templates/               # Framework templates
 ├── ONGOING_WORK/
-│   └── CONDUCTOR /              # Conductor system documentation
-│       ├── IMPLEMENTATION-PLAN.md   # ✅ Complete - all criteria met
-│       ├── AGENT-ONBOARDING.md      # Agent bootstrap document
-│       ├── FRAMEWORK.md             # 4-mode methodology
-│       └── ORCHESTRATION-MODEL.md   # Claude as PM, not worker
+│   ├── CONDUCTOR /              # Conductor system documentation
+│   │   ├── IMPLEMENTATION-PLAN.md   # ✅ Complete - all criteria met
+│   │   ├── AGENT-ONBOARDING.md      # Agent bootstrap document
+│   │   ├── FRAMEWORK.md             # 4-mode methodology
+│   │   └── ORCHESTRATION-MODEL.md   # Claude as PM, not worker
+│   └── CLI_AUTH/                # CLI Authentication (NEW)
+│       └── GATE-15-16-CLI-AUTH.md   # ✅ Gemini OAuth + AuthScreen
 ├── research/
 │   └── plugins/                 # Plugin research
 └── plans/

@@ -657,4 +657,45 @@ contextBridge.exposeInMainWorld('electronAPI', {
   sendStepDecision: (stepId: number, decision: 'retry' | 'skip' | 'stop'): Promise<boolean> => {
     return ipcRenderer.invoke('step:user-decision', stepId, decision);
   },
+
+  // ============================================================================
+  // UNIFIED AUTH METHODS (for AuthStatus panel)
+  // ============================================================================
+
+  /**
+   * Auth API for the AuthStatus panel component
+   */
+  auth: {
+    /**
+     * Check authentication status for all CLI tools
+     */
+    checkAll: (): Promise<AuthStatus[]> => {
+      return ipcRenderer.invoke('cli:auth-status-all');
+    },
+
+    /**
+     * Start authentication flow for a specific tool
+     */
+    authenticate: (tool: string): Promise<{ success: boolean; error?: string }> => {
+      return ipcRenderer.invoke('cli:auth-start', tool);
+    },
+
+    /**
+     * Listen for auth progress events (prompts and results)
+     * Returns a cleanup function to remove listeners
+     */
+    onProgress: (callback: (data: AuthPrompt | AuthResult) => void): (() => void) => {
+      const promptHandler = (_event: IpcRendererEvent, data: AuthPrompt) => callback(data);
+      const resultHandler = (_event: IpcRendererEvent, data: AuthResult) => callback(data);
+
+      ipcRenderer.on('cli:auth-prompt', promptHandler);
+      ipcRenderer.on('cli:auth-result', resultHandler);
+
+      // Return cleanup function
+      return () => {
+        ipcRenderer.removeListener('cli:auth-prompt', promptHandler);
+        ipcRenderer.removeListener('cli:auth-result', resultHandler);
+      };
+    },
+  },
 });
