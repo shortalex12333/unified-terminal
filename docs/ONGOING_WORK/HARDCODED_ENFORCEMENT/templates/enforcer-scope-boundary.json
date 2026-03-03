@@ -1,0 +1,47 @@
+{
+  "skill": "scope-enforcement",
+  "description": "Verify that only declared files were modified during step execution",
+  "checks": [
+    {
+      "id": 5,
+      "name": "scope-enforcement",
+      "label": "Scope Boundary Check",
+      "description": "Run git diff and compare against step.declaredFiles whitelist",
+      "script": "checks/check_scope.py",
+      "pass": "every modified file is in step.declaredFiles OR is in AUTO_GEN_WHITELIST",
+      "confidence": "definitive",
+      "when": "after every EXECUTE step",
+      "retries": {
+        "attempts": 1,
+        "delayMs": 0
+      },
+      "timeout": 10000,
+      "optional": false,
+      "whitelist": {
+        "exact": [
+          "package-lock.json",
+          "yarn.lock",
+          "pnpm-lock.yaml"
+        ],
+        "prefixes": [
+          ".next/",
+          "node_modules/",
+          "__pycache__/",
+          "dist/",
+          ".git/"
+        ]
+      }
+    }
+  ],
+  "activation": {
+    "triggers": ["every_execute"],
+    "tiers": [2, 3],
+    "skipConditions": []
+  },
+  "failure": {
+    "severity": "error",
+    "userMessage": "Step modified files outside of declared scope. This is a hard failure - scope creep indicates unplanned work or side effects.",
+    "allowSkip": false,
+    "options": ["Retry", "Stop build"]
+  }
+}

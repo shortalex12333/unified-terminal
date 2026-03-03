@@ -1,0 +1,46 @@
+{
+  "skill": "lesson-documentation",
+  "description": "Enforce complete lesson documentation after error resolution",
+  "checks": [
+    {
+      "id": 10,
+      "name": "lesson-template",
+      "label": "Lesson Template Validation",
+      "description": "Verify lesson file has all 4 required fields and no placeholder text",
+      "script": "checks/check_lesson.py",
+      "pass": "all 4 required fields present AND no forbidden placeholder patterns",
+      "confidence": "definitive",
+      "when": "after error resolution and fix applied",
+      "retries": {
+        "attempts": 1,
+        "delayMs": 0
+      },
+      "timeout": 5000,
+      "optional": false,
+      "requiredFields": [
+        "what broke",
+        "root cause",
+        "fix applied",
+        "prevention rule"
+      ],
+      "forbiddenPatterns": [
+        "one sentence",
+        "TODO",
+        "TBD",
+        "fill in",
+        "[placeholder]"
+      ]
+    }
+  ],
+  "activation": {
+    "triggers": ["post_error_fix"],
+    "tiers": [1, 2, 3],
+    "skipConditions": []
+  },
+  "failure": {
+    "severity": "error",
+    "userMessage": "Lesson template is incomplete. All 4 fields must be filled with substantive content. This is mandatory for system learning.",
+    "allowSkip": false,
+    "options": ["Retry", "Stop build"]
+  }
+}

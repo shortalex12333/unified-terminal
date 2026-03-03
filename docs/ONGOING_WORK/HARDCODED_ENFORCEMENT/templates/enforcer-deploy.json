@@ -1,0 +1,45 @@
+{
+  "skill": "deploy-health-enforcement",
+  "description": "Verify deployed URL responds with HTTP 200 and is not an error page",
+  "checks": [
+    {
+      "id": 12,
+      "name": "deploy-health",
+      "label": "Deploy Health Check",
+      "description": "HTTP GET deployed URL, verify 200 status and valid response body",
+      "script": "checks/check_deploy_health.py",
+      "pass": "curl deployed-url returns HTTP 200 AND body contains valid HTML (not error page)",
+      "confidence": "heuristic",
+      "when": "after deploy",
+      "retries": {
+        "attempts": 3,
+        "delayMs": 10000
+      },
+      "timeout": 40000,
+      "optional": false,
+      "deployedUrl": "${DEPLOYED_URL}",
+      "healthCheckCriteria": {
+        "expectedStatus": 200,
+        "mustNotContain": [
+          "Cannot GET",
+          "Error",
+          "Internal Server Error",
+          "404",
+          "not found"
+        ],
+        "minBodyBytes": 500
+      }
+    }
+  ],
+  "activation": {
+    "triggers": ["post_deploy"],
+    "tiers": [2, 3],
+    "skipConditions": []
+  },
+  "failure": {
+    "severity": "error",
+    "userMessage": "Deployed URL did not respond with HTTP 200 or returned an error page. This may be due to DNS propagation delay (can take up to 5 minutes). Retry in a moment.",
+    "allowSkip": false,
+    "options": ["Retry", "Stop build"]
+  }
+}

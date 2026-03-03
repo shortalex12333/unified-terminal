@@ -1,0 +1,361 @@
+{
+  "manifest_version": "1.0",
+  "generated": "2026-03-03",
+  "purpose": "Lightweight plugin requirements for Instance 2 (Adapters) - tool permissions, input format, output expectations per prompt",
+
+  "workers": {
+    "gsd-executor": {
+      "tools": ["Read", "Write", "Edit", "Bash", "Grep", "Glob"],
+      "input": {
+        "required": ["PLAN.md", "STATE.md"],
+        "optional": ["CONTEXT.md", "previous SUMMARY.md"]
+      },
+      "output": {
+        "files": ["SUMMARY.md", "updated STATE.md"],
+        "format": "markdown with structured sections",
+        "commits": "atomic per-task commits"
+      },
+      "runtime": "codex",
+      "timeout_minutes": 15,
+      "can_spawn_subagents": true
+    },
+
+    "gsd-planner": {
+      "tools": ["Read", "Write", "Bash", "Glob", "Grep", "WebFetch"],
+      "input": {
+        "required": ["STATE.md", "ROADMAP.md"],
+        "optional": ["CONTEXT.md", "RESEARCH.md"]
+      },
+      "output": {
+        "files": ["PLAN.md (multiple)"],
+        "format": "structured markdown with tasks, dependencies, acceptance criteria"
+      },
+      "runtime": "codex",
+      "timeout_minutes": 10,
+      "can_spawn_subagents": false
+    },
+
+    "gsd-debugger": {
+      "tools": ["Read", "Write", "Edit", "Bash", "Grep", "Glob", "WebSearch"],
+      "input": {
+        "required": ["error description or symptom"],
+        "optional": ["DEBUG.md from previous session"]
+      },
+      "output": {
+        "files": ["DEBUG.md"],
+        "format": "structured hypothesis-test-result chain"
+      },
+      "runtime": "codex",
+      "timeout_minutes": 15,
+      "can_spawn_subagents": true
+    },
+
+    "gsd-verifier": {
+      "tools": ["Read", "Write", "Bash", "Grep", "Glob"],
+      "input": {
+        "required": ["PLAN.md", "SUMMARY.md", "phase goal"],
+        "optional": ["CONTEXT.md"]
+      },
+      "output": {
+        "files": ["VERIFICATION.md"],
+        "format": "goal-backward verification report"
+      },
+      "runtime": "codex",
+      "timeout_minutes": 5,
+      "can_spawn_subagents": false
+    },
+
+    "gsd-codebase-mapper": {
+      "tools": ["Read", "Bash", "Grep", "Glob"],
+      "input": {
+        "required": ["codebase path"],
+        "optional": ["focus area (tech, arch, quality, concerns)"]
+      },
+      "output": {
+        "files": ["ARCHITECTURE.md", "STACK.md", "STRUCTURE.md"],
+        "format": "spine-compatible structured analysis"
+      },
+      "runtime": "codex",
+      "timeout_minutes": 10,
+      "can_spawn_subagents": false
+    },
+
+    "gsd-researcher": {
+      "tools": ["Read", "Write", "Bash", "Grep", "Glob", "WebSearch", "WebFetch"],
+      "input": {
+        "required": ["research question", "CONTEXT.md"],
+        "optional": ["existing RESEARCH.md"]
+      },
+      "output": {
+        "files": ["RESEARCH.md"],
+        "format": "structured findings with citations"
+      },
+      "runtime": "any",
+      "timeout_minutes": 15,
+      "can_spawn_subagents": true
+    },
+
+    "tdd-guide": {
+      "tools": ["Read", "Write", "Edit", "Bash"],
+      "input": {
+        "required": ["feature specification"],
+        "optional": ["existing test files"]
+      },
+      "output": {
+        "files": ["test files", "implementation files"],
+        "format": "test-first, red-green-refactor cycle"
+      },
+      "runtime": "codex",
+      "timeout_minutes": 20,
+      "can_spawn_subagents": true,
+      "verification": {
+        "test_must_fail_first": true,
+        "coverage_minimum": 0.8
+      }
+    },
+
+    "code-reviewer": {
+      "tools": ["Read", "Grep", "Glob"],
+      "input": {
+        "required": ["file paths or git diff"],
+        "optional": ["review criteria"]
+      },
+      "output": {
+        "format": "structured review with CRITICAL/HIGH/MEDIUM/LOW severity",
+        "includes_line_numbers": true
+      },
+      "runtime": "any",
+      "timeout_minutes": 5,
+      "can_spawn_subagents": false,
+      "read_only": true
+    },
+
+    "security-reviewer": {
+      "tools": ["Read", "Grep", "Glob"],
+      "input": {
+        "required": ["file paths"],
+        "optional": ["security focus area"]
+      },
+      "output": {
+        "format": "OWASP-aligned vulnerability report with severity"
+      },
+      "runtime": "any",
+      "timeout_minutes": 5,
+      "can_spawn_subagents": false,
+      "read_only": true
+    },
+
+    "build-error-resolver": {
+      "tools": ["Read", "Write", "Edit", "Bash"],
+      "input": {
+        "required": ["build error output"],
+        "optional": ["tsconfig.json", "package.json"]
+      },
+      "output": {
+        "format": "minimal-diff fixes only"
+      },
+      "runtime": "codex",
+      "timeout_minutes": 10,
+      "can_spawn_subagents": false,
+      "guardrails": {
+        "no_refactoring": true,
+        "no_new_features": true,
+        "minimal_changes_only": true
+      }
+    },
+
+    "doc-updater": {
+      "tools": ["Read", "Write", "Bash", "Glob"],
+      "input": {
+        "required": ["codebase path"],
+        "optional": ["existing docs"]
+      },
+      "output": {
+        "files": ["CODEMAPS/*.md", "updated README"],
+        "format": "token-efficient (<500 lines per file)"
+      },
+      "runtime": "codex",
+      "timeout_minutes": 10,
+      "can_spawn_subagents": false
+    },
+
+    "web-researcher": {
+      "tools": ["WebSearch", "WebFetch", "Read", "Write"],
+      "input": {
+        "required": ["research query"],
+        "optional": ["domain constraints"]
+      },
+      "output": {
+        "files": ["research output file"],
+        "format": "structured findings with URLs"
+      },
+      "runtime": "chatgpt_web",
+      "timeout_minutes": 15,
+      "can_spawn_subagents": true
+    },
+
+    "image-generator": {
+      "tools": ["DOM injection", "DOM extraction"],
+      "input": {
+        "required": ["image prompt"],
+        "optional": ["style parameters"]
+      },
+      "output": {
+        "format": "binary image file",
+        "extraction": "DOM-based image capture from DALL-E"
+      },
+      "runtime": "chatgpt_web",
+      "timeout_minutes": 3,
+      "can_spawn_subagents": false
+    },
+
+    "deploy-agent": {
+      "tools": ["Bash", "Read", "Write"],
+      "input": {
+        "required": ["project path", "deploy target"],
+        "optional": ["env vars"]
+      },
+      "output": {
+        "format": "deployment URL and status"
+      },
+      "runtime": "codex",
+      "timeout_minutes": 15,
+      "can_spawn_subagents": false,
+      "service_dependencies": ["vercel", "docker"]
+    }
+  },
+
+  "phases": {
+    "discuss": {
+      "tools": ["Read", "Write", "AskUserQuestion"],
+      "input": {
+        "required": ["phase goal from ROADMAP.md"],
+        "optional": ["existing CONTEXT.md"]
+      },
+      "output": {
+        "files": ["CONTEXT.md"],
+        "format": "locked decisions as structured key-value pairs"
+      },
+      "runtime": "chatgpt_web",
+      "interactive": true
+    },
+
+    "plan": {
+      "tools": ["Read", "Write"],
+      "spawns": ["gsd-researcher", "gsd-planner", "gsd-plan-checker"],
+      "input": {
+        "required": ["STATE.md", "CONTEXT.md"],
+        "optional": ["RESEARCH.md"]
+      },
+      "output": {
+        "files": ["PLAN.md (1-N)", "updated STATE.md"]
+      },
+      "runtime": "codex"
+    },
+
+    "execute": {
+      "tools": ["Read", "Write"],
+      "spawns": ["gsd-executor"],
+      "input": {
+        "required": ["PLAN.md files"],
+        "optional": ["wave grouping"]
+      },
+      "output": {
+        "files": ["SUMMARY.md per plan", "code changes", "git commits"]
+      },
+      "runtime": "codex",
+      "parallelism": "wave-based"
+    },
+
+    "verify": {
+      "tools": ["Read", "Write", "Bash"],
+      "spawns": ["gsd-verifier"],
+      "input": {
+        "required": ["phase goal", "SUMMARY.md files"],
+        "optional": ["UAT.md"]
+      },
+      "output": {
+        "files": ["VERIFICATION.md", "GAP list if failures"]
+      },
+      "runtime": "codex"
+    },
+
+    "unify": {
+      "tools": ["Read", "Write"],
+      "input": {
+        "required": ["PLAN.md", "actual output"],
+        "optional": []
+      },
+      "output": {
+        "files": ["SUMMARY.md with PLANNED|ACTUAL|DELTA"],
+        "format": "three-column reconciliation"
+      },
+      "runtime": "any"
+    }
+  },
+
+  "verification_skills": {
+    "verification-integrity": {
+      "tools": ["Bash", "Read"],
+      "checks": [
+        "test_count > 0 (not empty suite)",
+        "build_artifact_exists",
+        "no_skipped_tests_counted_as_pass"
+      ],
+      "runtime": "any",
+      "read_only": true
+    },
+
+    "docker-local-first": {
+      "tools": ["Bash"],
+      "checks": [
+        "docker build exit code 0",
+        "container starts",
+        "health endpoint returns 200"
+      ],
+      "runtime": "any",
+      "read_only": true
+    }
+  },
+
+  "frontend_design": {
+    "ui-ux-skill": {
+      "tools": ["Read", "Write", "Bash (for search.py)"],
+      "input": {
+        "required": ["design query OR default 'SaaS premium minimal clean apple whitespace'"],
+        "optional": ["product type", "style preference"]
+      },
+      "output": {
+        "format": "design system parameters from CSV databases"
+      },
+      "data_files": ["styles.csv", "colors.csv", "typography.csv", "charts.csv"],
+      "search_engine": "BM25 (k1=1.5, b=0.75)",
+      "runtime": "any"
+    }
+  },
+
+  "adapter_requirements_summary": {
+    "codex": {
+      "workers": ["gsd-executor", "gsd-planner", "gsd-debugger", "gsd-verifier", "gsd-codebase-mapper", "tdd-guide", "build-error-resolver", "doc-updater", "deploy-agent"],
+      "capabilities_needed": ["file_read", "file_write", "file_edit", "bash_exec", "session_resume"],
+      "max_payload_tokens": 3000,
+      "timeout_support": true
+    },
+    "claude": {
+      "workers": ["gsd-researcher", "code-reviewer", "security-reviewer"],
+      "capabilities_needed": ["file_read", "web_search", "web_fetch"],
+      "max_payload_tokens": 4000,
+      "timeout_support": true
+    },
+    "chatgpt_web": {
+      "workers": ["web-researcher", "image-generator"],
+      "capabilities_needed": ["dom_injection", "dom_extraction", "binary_image_capture"],
+      "requires_browserview": true
+    },
+    "gemini": {
+      "workers": ["fallback for any"],
+      "capabilities_needed": ["file_read", "file_write", "bash_exec"],
+      "no_session_resume": true
+    }
+  }
+}

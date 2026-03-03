@@ -1,0 +1,135 @@
+SUB-AGENT B: CHECK SCRIPTS GENERATOR — MANIFEST
+================================================
+
+Date: 2026-03-03
+Task: Write 12 check scripts from HARDCODED-ENFORCEMENT-VALUES.md
+Status: COMPLETE
+
+FILES CREATED
+─────────────
+
+Check Scripts (12):
+  1. check_tests.py (50 lines)
+  2. check_files_exist.py (40 lines)
+  3. check_files_nonempty.py (50 lines)
+  4. check_build_artifact.py (45 lines)
+  5. check_scope.py (60 lines)
+  6. check_tokens.py (55 lines)
+  7. check_secrets.sh (25 lines)
+  8. check_uninstall.py (40 lines)
+  9. check_docker_health.py (110 lines)
+  10. check_lesson.py (65 lines)
+  11. check_responsive.py (95 lines)
+  12. check_deploy_health.py (110 lines)
+
+Documentation (3):
+  - README.md (Usage guide, script reference)
+  - VERIFICATION.md (Acceptance criteria, verification report)
+  - INDEX.md (Directory index)
+  - MANIFEST.txt (This file)
+
+Total: 15 files, ~725 lines of code
+
+
+ACCEPTANCE CRITERIA
+───────────────────
+
+ [✓] All 12 scripts created in /checks/
+ [✓] Each script has shebang line
+ [✓] All scripts executable (chmod +x)
+ [✓] Each script takes projectDir as first argument
+ [✓] Each script exits 0 on PASS, 1 on FAIL
+ [✓] All checks 1-11 copied from HARDCODED-ENFORCEMENT-VALUES.md section 10
+ [✓] check_deploy_health.py follows docker_health pattern
+ [✓] Scripts have clear error messages
+
+
+USAGE
+─────
+
+Run any script:
+  python3 check_tests.py /path/to/project
+  bash check_secrets.sh /path/to/project
+
+Check result:
+  echo $?  # 0 = PASS, 1 = FAIL
+
+
+INTEGRATION
+───────────
+
+These scripts are called by:
+
+1. enforcer.ts (Sub-agent C)
+   - Spawns as subprocess
+   - Captures exit code + stdout
+   - Returns EnforcerResult
+
+2. bodyguard.ts (Sub-agent C)
+   - Filters based on CHECK_ACTIVATION
+   - Runs in parallel with Promise.allSettled()
+   - Aggregates results
+
+3. step-scheduler.ts (Sub-agent E)
+   - Called after each step
+   - Gates deployments
+   - Triggers circuit-breaker
+
+
+SPECIFICATIONS MET
+──────────────────
+
+All values from HARDCODED-ENFORCEMENT-VALUES.md:
+
+Check 1:  npm test, exit code === 0, > 0 tests
+Check 2:  fs.existsSync() for declared files
+Check 3:  File size > 50 bytes (whitelist: .env, .eslintrc, .prettierrc, .editorconfig, tsconfig.json)
+Check 4:  dist/ has .html/.js/.css (no .map files)
+Check 5:  git diff --name-only vs declared scope (whitelist: package-lock.json, yarn.lock, .next/, node_modules/, __pycache__/, dist/, .git/)
+Check 6:  tokens < killAt OR (> killAt AND progress > 0.85), 8 models per section 1
+Check 7:  gitleaks detect --exit-code 1
+Check 8:  node_modules/{package} verification for removed packages
+Check 9:  docker build && run && curl 200, no error strings, 3 retries × 5s delay
+Check 10: Regex: 4 required fields ("what broke", "root cause", "fix applied", "prevention rule"), no placeholders
+Check 11: Playwright 3 viewports (375×812, 768×1024, 1440×900), each > 1000 bytes
+Check 12: curl deployed-url 200, body > 500 bytes, no error strings, 3 retries × 10s delay
+
+
+TECHNICAL QUALITY
+──────────────────
+
+Language:   11 Python, 1 Bash
+Shebangs:   ✓ All present
+Execute:    ✓ All chmod +x
+Arguments:  ✓ All parse projectDir
+Exit Codes: ✓ All 0 on PASS, 1 on FAIL
+Errors:     ✓ All have clear messages
+Source Docs: ✓ All have headers
+
+
+READY FOR
+──────────
+
+Sub-agent C (Engine Core):
+  - Will write enforcer.ts to spawn these scripts
+  - Will write bodyguard.ts to dispatch in parallel
+  - Will write circuit-breaker.ts to handle failures
+
+Sub-agent E (Scheduler):
+  - Will integrate into step-scheduler.ts
+  - Will gate deployments on failures
+  - Will trigger user escape hatch
+
+
+NEXT PHASE
+───────────
+
+Sub-agents A-E run in parallel:
+  A: Constants (35 files, 1800 lines)
+  B: Check Scripts (12 files, 725 lines) ✓ COMPLETE
+  C: Engine Core (4 files, 600 lines)
+  D: Engine Infrastructure (6 files, 700 lines)
+  E: Scheduler + Spawner (8 files, 500 lines)
+
+Wall-clock: ~50 minutes (parallel)
+Then: Integration + verify.sh + verification

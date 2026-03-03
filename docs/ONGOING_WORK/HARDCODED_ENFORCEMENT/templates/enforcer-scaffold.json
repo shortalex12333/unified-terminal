@@ -1,0 +1,56 @@
+{
+  "skill": "scaffold-file-verification",
+  "description": "Verify all scaffolded files exist and have meaningful content",
+  "checks": [
+    {
+      "id": 2,
+      "name": "file-existence",
+      "label": "File Existence Check",
+      "description": "Verify all declared files exist on disk",
+      "script": "checks/check_files_exist.py",
+      "pass": "all declared files exist on filesystem",
+      "confidence": "definitive",
+      "when": "after every EXECUTE step",
+      "retries": {
+        "attempts": 1,
+        "delayMs": 0
+      },
+      "timeout": 5000,
+      "optional": false
+    },
+    {
+      "id": 3,
+      "name": "file-non-empty",
+      "label": "File Non-Empty Check",
+      "description": "Verify all files have meaningful content (> 50 bytes)",
+      "script": "checks/check_files_nonempty.py",
+      "pass": "all declared files > 50 bytes OR are known config types",
+      "confidence": "heuristic",
+      "when": "after file existence passes",
+      "retries": {
+        "attempts": 1,
+        "delayMs": 0
+      },
+      "timeout": 5000,
+      "optional": false,
+      "minMeaningfulBytes": 50,
+      "configFileWhitelist": [
+        ".env",
+        ".eslintrc",
+        ".prettierrc",
+        "tsconfig.json"
+      ]
+    }
+  ],
+  "activation": {
+    "triggers": ["every_execute"],
+    "tiers": [1, 2, 3],
+    "skipConditions": []
+  },
+  "failure": {
+    "severity": "error",
+    "userMessage": "Scaffolded files are missing or empty. The step did not produce expected output files.",
+    "allowSkip": false,
+    "options": ["Retry", "Stop build"]
+  }
+}

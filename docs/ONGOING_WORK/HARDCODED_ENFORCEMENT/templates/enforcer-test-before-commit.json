@@ -1,0 +1,33 @@
+{
+  "skill": "test-suite-enforcement",
+  "description": "Verify test suite passes before code commit",
+  "checks": [
+    {
+      "id": 1,
+      "name": "test-exit-code",
+      "label": "Test Suite Exit Code",
+      "description": "Run test suite and verify exit code is 0",
+      "script": "checks/check_tests.py",
+      "pass": "exit_code === 0",
+      "confidence": "definitive",
+      "when": "after every EXECUTE step that modifies code files",
+      "retries": {
+        "attempts": 1,
+        "delayMs": 0
+      },
+      "timeout": 60000,
+      "optional": false
+    }
+  ],
+  "activation": {
+    "triggers": ["code_modified"],
+    "tiers": [1, 2, 3],
+    "skipConditions": []
+  },
+  "failure": {
+    "severity": "error",
+    "userMessage": "Test suite failed. Fix the failing tests and try again.",
+    "allowSkip": false,
+    "options": ["Retry", "Stop build"]
+  }
+}
