@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 
 export type Provider = 'chatgpt' | 'gemini' | 'claude';
 
@@ -25,29 +25,40 @@ export default function ProfilePicker({ onSelectProvider }: Props) {
     gemini: false,
     claude: false,
   });
+  const [isLoading, setIsLoading] = useState(true);
   const [hoveredId, setHoveredId] = useState<Provider | null>(null);
 
-  useEffect(() => {
-    checkAuth();
-  }, []);
-
-  const checkAuth = async () => {
+  const checkAuth = useCallback(async () => {
+    setIsLoading(true);
     try {
-      const statuses = await window.electronAPI?.auth?.checkAll?.() || [];
+      const statuses = await window.electronAPI?.auth?.checkAll?.();
+
+      // Always initialize with all providers set to false
       const map: Record<Provider, boolean> = { chatgpt: false, gemini: false, claude: false };
 
-      // Map CLI tools to providers
-      statuses.forEach((s: any) => {
-        if (s.tool === 'codex') map.chatgpt = s.isAuthenticated;
-        if (s.tool === 'gemini') map.gemini = s.isAuthenticated;
-        if (s.tool === 'claude-code') map.claude = s.isAuthenticated;
-      });
+      // Map CLI tools to providers if we got valid statuses
+      if (Array.isArray(statuses)) {
+        statuses.forEach((s: { tool: string; isAuthenticated: boolean }) => {
+          if (s.tool === 'codex') map.chatgpt = s.isAuthenticated;
+          if (s.tool === 'gemini') map.gemini = s.isAuthenticated;
+          if (s.tool === 'claude-code') map.claude = s.isAuthenticated;
+        });
+      }
 
       setAuthStatus(map);
     } catch (err) {
       console.error('Auth check failed:', err);
+      // On error, show all providers as not authenticated (allows login attempt)
+      setAuthStatus({ chatgpt: false, gemini: false, claude: false });
+    } finally {
+      setIsLoading(false);
     }
-  };
+  }, []);
+
+  // Check auth on mount and whenever the component is shown
+  useEffect(() => {
+    checkAuth();
+  }, [checkAuth]);
 
   const handleSelect = async (provider: Provider) => {
     // If not authenticated, trigger auth flow first
@@ -125,10 +136,11 @@ export default function ProfilePicker({ onSelectProvider }: Props) {
               </span>
 
               {/* Auth status indicator */}
-              {authStatus[provider.id] && (
+              {isLoading ? (
+                <span className="text-xs text-[#5f6368] mt-1">Checking...</span>
+              ) : authStatus[provider.id] ? (
                 <span className="text-xs text-[#34a853] mt-1">● Connected</span>
-              )}
-              {!authStatus[provider.id] && (
+              ) : (
                 <span className="text-xs text-[#5f6368] mt-1">Sign in</span>
               )}
             </button>

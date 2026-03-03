@@ -1909,6 +1909,85 @@ ipcMain.handle('cli:send', async (
   await backgroundCLI.send(provider, message);
 });
 
+// ============================================================================
+// CHATGPT BROWSERVIEW IPC HANDLERS (Provider-specific routing)
+// ============================================================================
+
+/**
+ * IPC: Show the ChatGPT BrowserView (for ChatGPT provider)
+ * Attaches the BrowserView to the main window and makes it visible
+ */
+ipcMain.handle('chatgpt:show-view', async (): Promise<{ success: boolean; error?: string }> => {
+  console.log('[IPC] chatgpt:show-view called');
+
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    return { success: false, error: 'Main window not available' };
+  }
+
+  if (!chatGPTView) {
+    return { success: false, error: 'ChatGPT view not initialized' };
+  }
+
+  try {
+    // Attach BrowserView to window
+    mainWindow.setBrowserView(chatGPTView);
+
+    // Update bounds to fill the window
+    updateViewBounds(mainWindow, chatGPTView);
+
+    // Listen for window resize to update bounds
+    mainWindow.on('resize', () => {
+      if (chatGPTView && mainWindow && !mainWindow.isDestroyed()) {
+        updateViewBounds(mainWindow, chatGPTView);
+      }
+    });
+
+    // Load ChatGPT if not already loaded
+    const currentURL = chatGPTView.webContents.getURL();
+    if (!currentURL || !currentURL.includes('chatgpt.com')) {
+      console.log('[ChatGPT View] Loading ChatGPT...');
+      await chatGPTView.webContents.loadURL(CHATGPT_URL);
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error('[IPC] chatgpt:show-view error:', error);
+    return { success: false, error: String(error) };
+  }
+});
+
+/**
+ * IPC: Hide the ChatGPT BrowserView (when switching to CLI providers)
+ * Removes the BrowserView from the main window
+ */
+ipcMain.handle('chatgpt:hide-view', async (): Promise<{ success: boolean }> => {
+  console.log('[IPC] chatgpt:hide-view called');
+
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    return { success: false };
+  }
+
+  try {
+    // Remove BrowserView from window
+    mainWindow.setBrowserView(null);
+    return { success: true };
+  } catch (error) {
+    console.error('[IPC] chatgpt:hide-view error:', error);
+    return { success: false };
+  }
+});
+
+/**
+ * IPC: Check if ChatGPT BrowserView is currently visible
+ */
+ipcMain.handle('chatgpt:is-view-visible', async (): Promise<boolean> => {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    return false;
+  }
+  const view = mainWindow.getBrowserView();
+  return view === chatGPTView;
+});
+
 /**
  * IPC: Sign out from a CLI provider
  */

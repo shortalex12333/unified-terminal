@@ -17,20 +17,28 @@ interface CLIConfig {
   command: string;
   args: string[];
   env?: NodeJS.ProcessEnv;
+  /** If true, message is appended to args. If false, piped to stdin. */
+  appendMessage?: boolean;
 }
 
 const CLI_CONFIGS: Record<Provider, CLIConfig> = {
   'codex': {
     command: 'codex',
     args: ['--print', '--full-auto'],
+    appendMessage: true,
   },
   'claude-code': {
     command: 'claude',
-    args: ['--print'],
+    // Use --print for non-interactive one-shot mode
+    // Use -p for "print mode" which outputs response and exits
+    args: ['-p'],
+    appendMessage: true,
   },
   'gemini': {
     command: 'gemini',
-    args: ['--prompt'],
+    // Gemini CLI uses positional prompt argument
+    args: [],
+    appendMessage: true,
   },
 };
 
@@ -85,7 +93,10 @@ export class BackgroundCLI {
     // Kill existing process for this provider
     this.kill(provider);
 
-    const args = [...config.args, message];
+    // Build args - append message if config says to, otherwise we'll pipe it
+    const args = config.appendMessage !== false
+      ? [...config.args, message]
+      : [...config.args];
 
     console.log(`[BackgroundCLI] Spawning ${config.command} with args:`, args);
 

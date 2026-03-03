@@ -94,7 +94,7 @@ interface InstallResult {
 }
 
 // CLI Authentication types (Gate 6)
-type CLITool = 'codex' | 'claude-code';
+type CLITool = 'codex' | 'claude-code' | 'gemini';
 type AuthPromptType = 'oauth' | 'token' | 'tos' | 'question';
 
 interface AuthPrompt {
@@ -733,6 +733,38 @@ contextBridge.exposeInMainWorld('electronAPI', {
       return () => {
         ipcRenderer.removeAllListeners('cli:output');
       };
+    },
+  },
+
+  // ============================================================================
+  // CHATGPT BROWSERVIEW METHODS (Provider-specific routing)
+  // ============================================================================
+
+  /**
+   * ChatGPT BrowserView API for showing/hiding the embedded ChatGPT web view
+   */
+  chatgptView: {
+    /**
+     * Show the ChatGPT BrowserView (for ChatGPT provider)
+     * Attaches the BrowserView and loads chatgpt.com
+     */
+    show: (): Promise<{ success: boolean; error?: string }> => {
+      return ipcRenderer.invoke('chatgpt:show-view');
+    },
+
+    /**
+     * Hide the ChatGPT BrowserView (when switching to CLI providers)
+     * Removes the BrowserView from the window
+     */
+    hide: (): Promise<{ success: boolean }> => {
+      return ipcRenderer.invoke('chatgpt:hide-view');
+    },
+
+    /**
+     * Check if ChatGPT BrowserView is currently visible
+     */
+    isVisible: (): Promise<boolean> => {
+      return ipcRenderer.invoke('chatgpt:is-view-visible');
     },
   },
 });

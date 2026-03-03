@@ -56,6 +56,13 @@ interface ElectronAPI {
     onOutput: (cb: (data: CLIOutputData) => void) => () => void;
   };
 
+  // ChatGPT BrowserView methods for showing/hiding embedded web view
+  chatgptView: {
+    show: () => Promise<{ success: boolean; error?: string }>;
+    hide: () => Promise<{ success: boolean }>;
+    isVisible: () => Promise<boolean>;
+  };
+
   // Additional methods from preload.ts can be added here as needed
 }
 
