@@ -1,0 +1,9 @@
+Data Type,Keywords,Best Chart Type,Secondary Options,Color Guidance,Accessibility Notes,Library Recommendation,Interactive Level
+Time Series,trend over time temporal historical,"Line Chart","Area Chart, Bar Chart","Sequential colors, single hue gradient","Add data point markers, patterns for lines",Recharts Chart.js,High (hover zoom pan)
+Comparison,compare versus difference ranking,"Bar Chart","Column Chart, Grouped Bar","Categorical colors, distinct hues","Use patterns, sufficient spacing between bars",Chart.js Recharts,Medium (hover tooltips)
+Part-to-Whole,percentage proportion distribution,"Pie Chart","Donut Chart, Treemap","Diverging colors from center","Add labels, avoid too many segments (max 5-7)",D3.js Recharts,Medium (hover highlight)
+Correlation,relationship scatter clustering,"Scatter Plot","Bubble Chart, Heat Map","Diverging colors for positive/negative","Size encoding needs legend, add trend line",D3.js Plotly,High (zoom brush select)
+Distribution,frequency histogram density,"Histogram","Box Plot, Violin Plot","Single hue gradient","Add mean/median markers, show outliers",D3.js Recharts,Medium (hover bin details)
+Funnel,conversion stages pipeline,"Funnel Chart","Sankey Diagram","Sequential declining colors","Label each stage, show percentages",Recharts custom SVG,Low (hover tooltips)
+Geographic,map location spatial,"Choropleth Map","Dot Map, Heat Map","Sequential or diverging for data values","Provide data table alternative",Mapbox Leaflet D3.js,High (zoom pan click)
+Real-time Dashboard,live streaming monitoring,"Sparkline","Line Chart, Gauge","Alert colors for thresholds","Show numeric values alongside chart",Recharts custom,High (auto-refresh)

@@ -1,0 +1,1530 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "version": "1.0.0",
+  "generated": "2026-03-03",
+  "description": "Binary success criteria extracted from skill files for automated enforcement",
+
+  "gsd-planner": [
+    {
+      "check": "Every ROADMAP requirement ID mapped to a plan",
+      "script": "grep -o 'REQ-[0-9]*' .planning/ROADMAP.md | sort -u > /tmp/reqs.txt && grep -o 'REQ-[0-9]*' .planning/phases/**/PLAN.md | sort -u > /tmp/planned.txt && diff /tmp/reqs.txt /tmp/planned.txt",
+      "pass": "exitCode === 0",
+      "confidence": "definitive",
+      "rail": "HARD"
+    },
+    {
+      "check": "Each plan has 2-3 tasks with complete XML structure",
+      "script": "for f in .planning/phases/**/*-PLAN.md; do grep -c '<task' \"$f\" | awk '{if ($1 < 2 || $1 > 3) exit 1}'; done",
+      "pass": "exitCode === 0",
+      "confidence": "definitive",
+      "rail": "SOFT"
+    },
+    {
+      "check": "Wave numbers computed from depends_on graph",
+      "script": "grep -E '^wave:' .planning/phases/**/*-PLAN.md | wc -l",
+      "pass": "parseInt(output) > 0",
+      "confidence": "heuristic",
+      "rail": "SOFT"
+    },
+    {
+      "check": "must_haves.truths are observable by end user",
+      "script": "grep -A5 'truths:' .planning/phases/**/*-PLAN.md | grep -E '\".*\"'",
+      "pass": "output.length > 0",
+      "confidence": "heuristic",
+      "rail": "SOFT"
+    },
+    {
+      "check": "<verify> contains runnable command",
+      "script": "grep -A1 '<verify>' .planning/phases/**/*-PLAN.md | grep -vE '</?verify>'",
+      "pass": "output.length > 0",
+      "confidence": "heuristic",
+      "rail": "HARD"
+    },
+    {
+      "check": "No file appears in parallel plans (exclusive ownership)",
+      "script": "for wave in $(grep -h '^wave:' .planning/phases/**/*-PLAN.md | sort -u); do grep -h 'files_modified:' .planning/phases/**/*-PLAN.md | sort | uniq -d; done",
+      "pass": "output.trim() === ''",
+      "confidence": "definitive",
+      "rail": "HARD"
+    }
+  ],
+
+  "gsd-executor": [
+    {
+      "check": "SUMMARY.md exists at .planning/phases/*/ and is > 100 bytes",
+      "script": "find .planning/phases -name '*-SUMMARY.md' -size +100c | head -1",
+      "pass": "output.length > 0",
+      "confidence": "definitive",
+      "rail": "HARD"
+    },
+    {
+      "check": "SUMMARY.md contains 'Self-Check: PASSED'",
+      "script": "grep -l 'Self-Check: PASSED' .planning/phases/**/*-SUMMARY.md",
+      "pass": "output.length > 0",
+      "confidence": "definitive",
+      "rail": "HARD"
+    },
+    {
+      "check": "git log shows commits matching {type}({phase}-{plan}):",
+      "script": "git log --oneline -10 | grep -E '(feat|fix|docs|chore|refactor)\\([0-9]+-[0-9]+\\):'",
+      "pass": "output.length > 0",
+      "confidence": "definitive",
+      "rail": "HARD"
+    },
+    {
+      "check": "STATE.md updated timestamp is within last 5 minutes",
+      "script": "find .planning/STATE.md -mmin -5",
+      "pass": "output.includes('STATE.md')",
+      "confidence": "definitive",
+      "rail": "SOFT"
+    },
+    {
+      "check": "No files modified outside paths listed in PLAN.md scope",
+      "script": "git diff --name-only HEAD~1 HEAD",
+      "pass": "/* requires manual verification against PLAN.md files_modified */",
+      "confidence": "heuristic",
+      "rail": "SOFT"
+    },
+    {
+      "check": "Exit with structured completion format containing all commit hashes",
+      "script": "grep -E '[0-9a-f]{7,40}' /tmp/last_executor_output.txt",
+      "pass": "output.length > 0",
+      "confidence": "heuristic",
+      "rail": "SOFT"
+    }
+  ],
+
+  "gsd-debugger": [
+    {
+      "check": "Debug file created IMMEDIATELY on command",
+      "script": "ls -la .planning/debug/DEBUG.md 2>/dev/null || ls -la DEBUG.md 2>/dev/null",
+      "pass": "output.includes('DEBUG.md')",
+      "confidence": "definitive",
+      "rail": "HARD"
+    },
+    {
+      "check": "Symptoms documented before investigating",
+      "script": "grep -A10 '## Symptoms' DEBUG.md | grep -E '(expected|actual|errors|reproduction):'",
+      "pass": "output.length > 0",
+      "confidence": "definitive",
+      "rail": "HARD"
+    },
+    {
+      "check": "Each hypothesis is specific and falsifiable",
+      "script": "grep -E '^hypothesis:' DEBUG.md",
+      "pass": "output.length > 0",
+      "confidence": "heuristic",
+      "rail": "SOFT"
+    },
+    {
+      "check": "Evidence appended after every finding",
+      "script": "grep -c '## Evidence' DEBUG.md && grep -A100 '## Evidence' DEBUG.md | grep -c '- checked:'",
+      "pass": "parseInt(output.split('\\n')[1]) > 0",
+      "confidence": "heuristic",
+      "rail": "SOFT"
+    },
+    {
+      "check": "Eliminated hypotheses prevent re-investigation",
+      "script": "grep -A50 '## Eliminated' DEBUG.md | grep -c 'hypothesis:'",
+      "pass": "parseInt(output) >= 0",
+      "confidence": "heuristic",
+      "rail": "SOFT"
+    },
+    {
+      "check": "Root cause identified with supporting evidence",
+      "script": "grep 'root_cause:' DEBUG.md | grep -v 'empty'",
+      "pass": "output.length > 15",
+      "confidence": "heuristic",
+      "rail": "HARD"
+    },
+    {
+      "check": "Fix is minimal and targeted",
+      "script": "grep 'fix:' DEBUG.md | grep -v 'empty'",
+      "pass": "output.length > 0",
+      "confidence": "heuristic",
+      "rail": "SOFT"
+    },
+    {
+      "check": "Fix verified against original reproduction steps",
+      "script": "grep 'verification:' DEBUG.md | grep -v 'empty'",
+      "pass": "output.length > 0",
+      "confidence": "definitive",
+      "rail": "HARD"
+    },
+    {
+      "check": "Can resume perfectly after any /clear",
+      "script": "ls -la DEBUG.md && grep -c 'status:' DEBUG.md",
+      "pass": "output.includes('DEBUG.md') && parseInt(output.split('\\n')[1]) > 0",
+      "confidence": "heuristic",
+      "rail": "SOFT"
+    },
+    {
+      "check": "Human confirms fix works in real environment",
+      "script": "grep -E 'status: (resolved|verified)' DEBUG.md",
+      "pass": "output.length > 0",
+      "confidence": "heuristic",
+      "rail": "SOFT"
+    }
+  ],
+
+  "gsd-verifier": [
+    {
+      "check": "VERIFICATION.md produced with complete report",
+      "script": "ls -la .planning/phases/**/*-VERIFICATION.md 2>/dev/null | head -1",
+      "pass": "output.includes('VERIFICATION.md')",
+      "confidence": "definitive",
+      "rail": "HARD"
+    },
+    {
+      "check": "Each must-have has PASS/FAIL status with evidence",
+      "script": "grep -E '(VERIFIED|FAILED|UNCERTAIN)' .planning/phases/**/*-VERIFICATION.md | wc -l",
+      "pass": "parseInt(output) > 0",
+      "confidence": "definitive",
+      "rail": "HARD"
+    },
+    {
+      "check": "All artifacts checked at 3 levels (exists, substantive, wired)",
+      "script": "grep -E '\\| (Yes|No) \\| (Yes|No) \\| (Yes|No) \\|' .planning/phases/**/*-VERIFICATION.md | wc -l",
+      "pass": "parseInt(output) > 0",
+      "confidence": "definitive",
+      "rail": "HARD"
+    },
+    {
+      "check": "All key links verified",
+      "script": "grep -E '(WIRED|PARTIAL|NOT_WIRED)' .planning/phases/**/*-VERIFICATION.md | wc -l",
+      "pass": "parseInt(output) >= 0",
+      "confidence": "heuristic",
+      "rail": "SOFT"
+    },
+    {
+      "check": "Anti-patterns scanned and categorized",
+      "script": "grep -E '(BLOCKER|WARNING|INFO)' .planning/phases/**/*-VERIFICATION.md",
+      "pass": "/* output may be empty if no anti-patterns found */",
+      "confidence": "heuristic",
+      "rail": "SOFT"
+    },
+    {
+      "check": "Human verification items identified",
+      "script": "grep -E 'human.*(verification|needed|verify)' .planning/phases/**/*-VERIFICATION.md -i",
+      "pass": "/* output may be empty if all automated */",
+      "confidence": "heuristic",
+      "rail": "SOFT"
+    },
+    {
+      "check": "If gaps_found: structured gap list in YAML frontmatter",
+      "script": "grep -A20 '^gaps:' .planning/phases/**/*-VERIFICATION.md | head -20",
+      "pass": "/* only required if status: gaps_found */",
+      "confidence": "heuristic",
+      "rail": "SOFT"
+    },
+    {
+      "check": "Results returned to orchestrator (NOT committed)",
+      "script": "git status --porcelain .planning/phases/**/*-VERIFICATION.md 2>/dev/null",
+      "pass": "/* verifier should not commit */",
+      "confidence": "heuristic",
+      "rail": "SOFT"
+    }
+  ],
+
+  "gsd-researcher": [
+    {
+      "check": "RESEARCH.md file exists at correct path",
+      "script": "ls -la .planning/phases/**/*-RESEARCH.md 2>/dev/null | head -1",
+      "pass": "output.includes('RESEARCH.md')",
+      "confidence": "definitive",
+      "rail": "HARD"
+    },
+    {
+      "check": "Every claim has source URL or Context7 reference",
+      "script": "grep -E '(http|Context7|/[a-z]+/)' .planning/phases/**/*-RESEARCH.md | wc -l",
+      "pass": "parseInt(output) > 0",
+      "confidence": "heuristic",
+      "rail": "HARD"
+    },
+    {
+      "check": "Confidence levels assigned to all sections",
+      "script": "grep -E '(HIGH|MEDIUM|LOW)' .planning/phases/**/*-RESEARCH.md | wc -l",
+      "pass": "parseInt(output) > 0",
+      "confidence": "definitive",
+      "rail": "HARD"
+    },
+    {
+      "check": "Standard stack includes versions",
+      "script": "grep -E '[0-9]+\\.[0-9]+' .planning/phases/**/*-RESEARCH.md | grep -iE '(version|v[0-9])' | wc -l",
+      "pass": "parseInt(output) > 0",
+      "confidence": "heuristic",
+      "rail": "SOFT"
+    },
+    {
+      "check": "Code examples cite their source",
+      "script": "grep -B2 '```' .planning/phases/**/*-RESEARCH.md | grep -iE '(source|from|http)'",
+      "pass": "output.length > 0",
+      "confidence": "heuristic",
+      "rail": "SOFT"
+    },
+    {
+      "check": "User constraints section present if CONTEXT.md exists",
+      "script": "if [ -f .planning/phases/**/CONTEXT.md ]; then grep -l 'User Constraints' .planning/phases/**/*-RESEARCH.md; fi",
+      "pass": "/* only required if CONTEXT.md exists */",
+      "confidence": "heuristic",
+      "rail": "SOFT"
+    },
+    {
+      "check": "Structured return provided: phase, confidence, key findings, file path",
+      "script": "grep -E '(phase|confidence|findings|path)' .planning/phases/**/*-RESEARCH.md | wc -l",
+      "pass": "parseInt(output) >= 2",
+      "confidence": "heuristic",
+      "rail": "SOFT"
+    }
+  ],
+
+  "gsd-codebase-mapper": [
+    {
+      "check": "Focus area parsed from prompt",
+      "script": "ls .planning/codebase/*.md 2>/dev/null | wc -l",
+      "pass": "parseInt(output) > 0",
+      "confidence": "definitive",
+      "rail": "HARD"
+    },
+    {
+      "check": "All relevant files explored for focus area",
+      "script": "grep -E '`[^`]+\\.(ts|js|py|go|rs)`' .planning/codebase/*.md | wc -l",
+      "pass": "parseInt(output) > 0",
+      "confidence": "heuristic",
+      "rail": "SOFT"
+    },
+    {
+      "check": "Documents written to .planning/codebase/",
+      "script": "ls -la .planning/codebase/*.md 2>/dev/null",
+      "pass": "output.includes('.md')",
+      "confidence": "definitive",
+      "rail": "HARD"
+    },
+    {
+      "check": "Documents follow template structure exactly",
+      "script": "grep -E '^(# |## |\\*\\*Analysis Date:\\*\\*)' .planning/codebase/*.md | wc -l",
+      "pass": "parseInt(output) > 2",
+      "confidence": "heuristic",
+      "rail": "SOFT"
+    },
+    {
+      "check": "Every finding includes a file path in backticks",
+      "script": "grep -c '`[^`]*\\.[a-z]+`' .planning/codebase/*.md",
+      "pass": "parseInt(output) > 5",
+      "confidence": "heuristic",
+      "rail": "SOFT"
+    },
+    {
+      "check": "Response is confirmation only (~10 lines)",
+      "script": "/* This checks agent response, not file output */",
+      "pass": "/* manual verification */",
+      "confidence": "heuristic",
+      "rail": "SOFT"
+    },
+    {
+      "check": "No secret file contents exposed",
+      "script": "grep -riE '(sk-|api_key|password|secret)' .planning/codebase/*.md | grep -v 'env var' | wc -l",
+      "pass": "parseInt(output) === 0",
+      "confidence": "definitive",
+      "rail": "HARD"
+    }
+  ],
+
+  "tdd-guide": [
+    {
+      "check": "Exit code 0 from npm test",
+      "script": "npm test 2>&1; echo \"EXIT:$?\"",
+      "pass": "output.includes('EXIT:0')",
+      "confidence": "definitive",
+      "rail": "HARD"
+    },
+    {
+      "check": "Coverage >= 80% for branches",
+      "script": "npm run test:coverage 2>&1 | grep -E 'Branches\\s+:\\s+[0-9]+' | awk '{print $3}'",
+      "pass": "parseFloat(output) >= 80",
+      "confidence": "definitive",
+      "rail": "HARD"
+    },
+    {
+      "check": "Coverage >= 80% for functions",
+      "script": "npm run test:coverage 2>&1 | grep -E 'Functions\\s+:\\s+[0-9]+' | awk '{print $3}'",
+      "pass": "parseFloat(output) >= 80",
+      "confidence": "definitive",
+      "rail": "HARD"
+    },
+    {
+      "check": "Coverage >= 80% for lines",
+      "script": "npm run test:coverage 2>&1 | grep -E 'Lines\\s+:\\s+[0-9]+' | awk '{print $3}'",
+      "pass": "parseFloat(output) >= 80",
+      "confidence": "definitive",
+      "rail": "HARD"
+    },
+    {
+      "check": "Coverage >= 80% for statements",
+      "script": "npm run test:coverage 2>&1 | grep -E 'Statements\\s+:\\s+[0-9]+' | awk '{print $3}'",
+      "pass": "parseFloat(output) >= 80",
+      "confidence": "definitive",
+      "rail": "HARD"
+    },
+    {
+      "check": "All 8 edge case categories tested",
+      "script": "grep -E '(null|undefined|empty|invalid|boundary|error|race|large)' tests/**/*.test.ts -i | wc -l",
+      "pass": "parseInt(output) >= 8",
+      "confidence": "heuristic",
+      "rail": "SOFT"
+    },
+    {
+      "check": "No implementation code before corresponding test",
+      "script": "/* requires git history analysis */",
+      "pass": "/* manual verification */",
+      "confidence": "heuristic",
+      "rail": "SOFT"
+    },
+    {
+      "check": "Tests are independent (can run in any order)",
+      "script": "npm test -- --shuffle 2>&1; echo \"EXIT:$?\"",
+      "pass": "output.includes('EXIT:0')",
+      "confidence": "definitive",
+      "rail": "SOFT"
+    }
+  ],
+
+  "code-reviewer": [
+    {
+      "check": "Zero CRITICAL issues = can merge",
+      "script": "grep -c '\\[CRITICAL\\]' /tmp/code_review_output.txt 2>/dev/null || echo '0'",
+      "pass": "parseInt(output) === 0",
+      "confidence": "definitive",
+      "rail": "HARD"
+    },
+    {
+      "check": "Zero CRITICAL + zero HIGH = approve",
+      "script": "grep -cE '\\[(CRITICAL|HIGH)\\]' /tmp/code_review_output.txt 2>/dev/null || echo '0'",
+      "pass": "parseInt(output) === 0",
+      "confidence": "definitive",
+      "rail": "SOFT"
+    },
+    {
+      "check": "Any CRITICAL = must block",
+      "script": "grep -l '\\[CRITICAL\\]' /tmp/code_review_output.txt 2>/dev/null",
+      "pass": "output.trim() === ''",
+      "confidence": "definitive",
+      "rail": "HARD"
+    },
+    {
+      "check": "Findings are actionable (not vague)",
+      "script": "grep -E '(Fix:|Issue:)' /tmp/code_review_output.txt | wc -l",
+      "pass": "/* each finding should have Fix: */",
+      "confidence": "heuristic",
+      "rail": "SOFT"
+    },
+    {
+      "check": "No false positives (noise)",
+      "script": "/* requires human verification */",
+      "pass": "/* manual verification */",
+      "confidence": "heuristic",
+      "rail": "SOFT"
+    }
+  ],
+
+  "security-reviewer": [
+    {
+      "check": "Zero CRITICAL issues",
+      "script": "grep -c '\\[CRITICAL\\]' /tmp/security_audit_output.txt 2>/dev/null || echo '0'",
+      "pass": "parseInt(output) === 0",
+      "confidence": "definitive",
+      "rail": "HARD"
+    },
+    {
+      "check": "All HIGH issues addressed with fixes",
+      "script": "grep -A3 '\\[HIGH\\]' /tmp/security_audit_output.txt | grep -c 'Fix:'",
+      "pass": "/* each HIGH should have a Fix */",
+      "confidence": "heuristic",
+      "rail": "HARD"
+    },
+    {
+      "check": "No secrets in source code",
+      "script": "grep -rE '(sk-[a-zA-Z0-9]{20,}|password\\s*=\\s*[\"'][^\"']+[\"']|api_key\\s*=\\s*[\"'][^\"']+[\"'])' src/ --include='*.ts' --include='*.js' | grep -v '.env' | wc -l",
+      "pass": "parseInt(output) === 0",
+      "confidence": "definitive",
+      "rail": "HARD"
+    },
+    {
+      "check": "npm audit --audit-level=high exits with code 0",
+      "script": "npm audit --audit-level=high 2>&1; echo \"EXIT:$?\"",
+      "pass": "output.includes('EXIT:0')",
+      "confidence": "definitive",
+      "rail": "HARD"
+    },
+    {
+      "check": "All OWASP Top 10 categories checked",
+      "script": "grep -E '(Injection|Auth|Sensitive|XXE|Access|Misconfiguration|XSS|Deserialization|Vulnerabilities|Logging)' /tmp/security_audit_output.txt | wc -l",
+      "pass": "parseInt(output) >= 5",
+      "confidence": "heuristic",
+      "rail": "SOFT"
+    }
+  ],
+
+  "build-error-resolver": [
+    {
+      "check": "npx tsc --noEmit exits with code 0",
+      "script": "npx tsc --noEmit 2>&1; echo \"EXIT:$?\"",
+      "pass": "output.includes('EXIT:0')",
+      "confidence": "definitive",
+      "rail": "HARD"
+    },
+    {
+      "check": "npm run build exits with code 0",
+      "script": "npm run build 2>&1; echo \"EXIT:$?\"",
+      "pass": "output.includes('EXIT:0')",
+      "confidence": "definitive",
+      "rail": "HARD"
+    },
+    {
+      "check": "No new errors introduced",
+      "script": "npx tsc --noEmit 2>&1 | grep -c 'error TS' || echo '0'",
+      "pass": "parseInt(output) === 0",
+      "confidence": "definitive",
+      "rail": "HARD"
+    },
+    {
+      "check": "Lines changed < 5% of affected files",
+      "script": "git diff --stat | tail -1 | awk '{print $4}'",
+      "pass": "/* requires comparison to file sizes */",
+      "confidence": "heuristic",
+      "rail": "SOFT"
+    },
+    {
+      "check": "Tests still passing",
+      "script": "npm test 2>&1; echo \"EXIT:$?\"",
+      "pass": "output.includes('EXIT:0')",
+      "confidence": "definitive",
+      "rail": "HARD"
+    }
+  ],
+
+  "doc-updater": [
+    {
+      "check": "All codemaps < 500 lines",
+      "script": "wc -l docs/CODEMAPS/*.md 2>/dev/null | awk '$1 > 500 {print $2}'",
+      "pass": "output.trim() === ''",
+      "confidence": "definitive",
+      "rail": "HARD"
+    },
+    {
+      "check": "Timestamps updated to today",
+      "script": "grep -E 'Last Updated:.*$(date +%Y-%m-%d)' docs/CODEMAPS/*.md | wc -l",
+      "pass": "parseInt(output) > 0",
+      "confidence": "definitive",
+      "rail": "SOFT"
+    },
+    {
+      "check": "All file paths verified to exist",
+      "script": "grep -ohE '`[^`]+\\.[a-z]+`' docs/CODEMAPS/*.md | tr -d '`' | while read f; do [ -f \"$f\" ] || echo \"MISSING: $f\"; done",
+      "pass": "output.trim() === '' || !output.includes('MISSING')",
+      "confidence": "definitive",
+      "rail": "HARD"
+    },
+    {
+      "check": "All code examples compile",
+      "script": "/* requires extracting and testing code blocks */",
+      "pass": "/* manual verification */",
+      "confidence": "heuristic",
+      "rail": "SOFT"
+    },
+    {
+      "check": "All links resolve",
+      "script": "grep -ohE '\\[.*\\]\\(([^)]+)\\)' docs/CODEMAPS/*.md | grep -oE '\\([^)]+\\)' | tr -d '()' | while read l; do [ -f \"$l\" ] || [ -d \"$l\" ] || echo \"BROKEN: $l\"; done",
+      "pass": "!output.includes('BROKEN')",
+      "confidence": "definitive",
+      "rail": "SOFT"
+    },
+    {
+      "check": "No obsolete references",
+      "script": "/* requires semantic analysis */",
+      "pass": "/* manual verification */",
+      "confidence": "heuristic",
+      "rail": "SOFT"
+    }
+  ],
+
+  "web-researcher": [
+    {
+      "check": "Research question clearly answered",
+      "script": "grep -c '## Executive Summary' /tmp/research_output.md || echo '0'",
+      "pass": "parseInt(output) > 0",
+      "confidence": "heuristic",
+      "rail": "SOFT"
+    },
+    {
+      "check": "Every claim has source URL",
+      "script": "grep -cE 'https?://' /tmp/research_output.md",
+      "pass": "parseInt(output) >= 3",
+      "confidence": "definitive",
+      "rail": "HARD"
+    },
+    {
+      "check": "Confidence levels assigned to all findings",
+      "script": "grep -cE '(HIGH|MEDIUM|LOW|UNVERIFIED)' /tmp/research_output.md",
+      "pass": "parseInt(output) >= 1",
+      "confidence": "definitive",
+      "rail": "HARD"
+    },
+    {
+      "check": "Publication dates included where available",
+      "script": "grep -cE '(Published|Date|[0-9]{4})' /tmp/research_output.md",
+      "pass": "parseInt(output) >= 1",
+      "confidence": "heuristic",
+      "rail": "SOFT"
+    },
+    {
+      "check": "Contradictions explicitly noted",
+      "script": "grep -ciE '(contradiction|conflict|disagree|however|but)' /tmp/research_output.md || echo '0'",
+      "pass": "/* may be 0 if no contradictions */",
+      "confidence": "heuristic",
+      "rail": "SOFT"
+    },
+    {
+      "check": "At least 3 sources consulted",
+      "script": "grep -oE 'https?://[^)\\\" ]+' /tmp/research_output.md | cut -d'/' -f3 | sort -u | wc -l",
+      "pass": "parseInt(output) >= 3",
+      "confidence": "definitive",
+      "rail": "HARD"
+    },
+    {
+      "check": "Sources section includes all URLs used",
+      "script": "grep -A100 '## Sources' /tmp/research_output.md | grep -cE 'https?://'",
+      "pass": "parseInt(output) >= 1",
+      "confidence": "definitive",
+      "rail": "HARD"
+    },
+    {
+      "check": "Search queries documented for reproducibility",
+      "script": "grep -c '## Search Queries' /tmp/research_output.md || echo '0'",
+      "pass": "parseInt(output) > 0",
+      "confidence": "definitive",
+      "rail": "SOFT"
+    }
+  ],
+
+  "worker-deploy": [
+    {
+      "check": "npm run build exits with code 0",
+      "script": "npm run build 2>&1; echo \"EXIT:$?\"",
+      "pass": "output.includes('EXIT:0')",
+      "confidence": "definitive",
+      "rail": "HARD"
+    },
+    {
+      "check": "npm test shows all tests passing",
+      "script": "npm test 2>&1; echo \"EXIT:$?\"",
+      "pass": "output.includes('EXIT:0')",
+      "confidence": "definitive",
+      "rail": "HARD"
+    },
+    {
+      "check": "No secrets grep matches in staged code",
+      "script": "git diff --cached --name-only | xargs grep -lE '(sk-|password\\s*=|api_key\\s*=|secret\\s*=)' 2>/dev/null | wc -l",
+      "pass": "parseInt(output) === 0",
+      "confidence": "definitive",
+      "rail": "HARD"
+    },
+    {
+      "check": "npm audit --audit-level=high exits with code 0",
+      "script": "npm audit --audit-level=high 2>&1; echo \"EXIT:$?\"",
+      "pass": "output.includes('EXIT:0')",
+      "confidence": "definitive",
+      "rail": "HARD"
+    },
+    {
+      "check": "Deployment command completes without error",
+      "script": "/* depends on deployment target */",
+      "pass": "exitCode === 0",
+      "confidence": "definitive",
+      "rail": "HARD"
+    },
+    {
+      "check": "Deployment URL accessible (HTTP 200)",
+      "script": "curl -s -o /dev/null -w '%{http_code}' $DEPLOY_URL",
+      "pass": "output === '200'",
+      "confidence": "definitive",
+      "rail": "HARD"
+    },
+    {
+      "check": "Response time < 3 seconds",
+      "script": "curl -s -o /dev/null -w '%{time_total}' $DEPLOY_URL",
+      "pass": "parseFloat(output) < 3",
+      "confidence": "definitive",
+      "rail": "SOFT"
+    },
+    {
+      "check": "SSL certificate valid",
+      "script": "echo | openssl s_client -servername $DOMAIN -connect $DOMAIN:443 2>/dev/null | openssl x509 -noout -checkend 86400",
+      "pass": "exitCode === 0",
+      "confidence": "definitive",
+      "rail": "HARD"
+    },
+    {
+      "check": "Smoke tests pass",
+      "script": "curl -s $DEPLOY_URL | grep -q '<title>' && echo 'OK'",
+      "pass": "output === 'OK'",
+      "confidence": "definitive",
+      "rail": "HARD"
+    },
+    {
+      "check": "Rollback command documented",
+      "script": "grep -c 'rollback' /tmp/deploy_report.md || echo '0'",
+      "pass": "parseInt(output) > 0",
+      "confidence": "heuristic",
+      "rail": "SOFT"
+    }
+  ],
+
+  "worker-image-gen": [
+    {
+      "check": "Image type correctly identified",
+      "script": "/* requires parsing agent output */",
+      "pass": "/* manual verification */",
+      "confidence": "heuristic",
+      "rail": "SOFT"
+    },
+    {
+      "check": "Prompt crafted with all relevant details",
+      "script": "grep -c 'Prompt Used:' /tmp/image_gen_report.md || echo '0'",
+      "pass": "parseInt(output) > 0",
+      "confidence": "heuristic",
+      "rail": "SOFT"
+    },
+    {
+      "check": "Image generated via ChatGPT/DALL-E",
+      "script": "/* requires ChatGPT interaction verification */",
+      "pass": "/* manual verification */",
+      "confidence": "heuristic",
+      "rail": "HARD"
+    },
+    {
+      "check": "Image extracted from response",
+      "script": "/* requires DOM extraction verification */",
+      "pass": "/* manual verification */",
+      "confidence": "heuristic",
+      "rail": "HARD"
+    },
+    {
+      "check": "Image saved to specified local path",
+      "script": "ls -la $OUTPUT_PATH 2>/dev/null",
+      "pass": "output.length > 0",
+      "confidence": "definitive",
+      "rail": "HARD"
+    },
+    {
+      "check": "Output format matches use case (PNG/JPG/WebP)",
+      "script": "file $OUTPUT_PATH | grep -iE '(PNG|JPEG|WebP)'",
+      "pass": "output.length > 0",
+      "confidence": "definitive",
+      "rail": "SOFT"
+    },
+    {
+      "check": "Dimensions match requirements",
+      "script": "identify -format '%wx%h' $OUTPUT_PATH 2>/dev/null || sips -g pixelWidth -g pixelHeight $OUTPUT_PATH",
+      "pass": "/* requires dimension comparison */",
+      "confidence": "definitive",
+      "rail": "SOFT"
+    },
+    {
+      "check": "Prompt documented for reproducibility",
+      "script": "grep -c 'Prompt Used:' /tmp/image_gen_report.md || echo '0'",
+      "pass": "parseInt(output) > 0",
+      "confidence": "definitive",
+      "rail": "SOFT"
+    },
+    {
+      "check": "User satisfied with result (or iteration path clear)",
+      "script": "/* requires human verification */",
+      "pass": "/* manual verification */",
+      "confidence": "heuristic",
+      "rail": "SOFT"
+    }
+  ],
+
+  "discuss-phase": [
+    {
+      "check": "CONTEXT.md exists with <decisions> section populated",
+      "script": "grep -c '<decisions>' .planning/phases/**/*-CONTEXT.md 2>/dev/null || echo '0'",
+      "pass": "parseInt(output) > 0",
+      "confidence": "definitive",
+      "rail": "HARD"
+    },
+    {
+      "check": "Prior decisions were not re-asked",
+      "script": "/* requires conversation analysis */",
+      "pass": "/* manual verification */",
+      "confidence": "heuristic",
+      "rail": "SOFT"
+    },
+    {
+      "check": "Scope creep was redirected to <deferred> section",
+      "script": "grep -c '<deferred>' .planning/phases/**/*-CONTEXT.md 2>/dev/null || echo '0'",
+      "pass": "parseInt(output) >= 0",
+      "confidence": "heuristic",
+      "rail": "SOFT"
+    },
+    {
+      "check": "Each decision is actionable by downstream agents",
+      "script": "grep -A50 '<decisions>' .planning/phases/**/*-CONTEXT.md | grep -cE '(locked|discretion|deferred)' || echo '0'",
+      "pass": "parseInt(output) > 0",
+      "confidence": "heuristic",
+      "rail": "SOFT"
+    },
+    {
+      "check": "User explicitly approved or moved to next step",
+      "script": "/* requires conversation analysis */",
+      "pass": "/* manual verification */",
+      "confidence": "heuristic",
+      "rail": "SOFT"
+    }
+  ],
+
+  "plan-phase": [
+    {
+      "check": "Research completed (or skipped with reason)",
+      "script": "ls .planning/phases/**/*-RESEARCH.md 2>/dev/null || grep 'skip-research' .planning/STATE.md",
+      "pass": "output.length > 0",
+      "confidence": "definitive",
+      "rail": "SOFT"
+    },
+    {
+      "check": "PLAN.md files have wave, depends_on, files_modified, autonomous frontmatter",
+      "script": "for f in .planning/phases/**/*-PLAN.md; do grep -cE '^(wave|depends_on|files_modified|autonomous):' \"$f\" | awk '{if ($1 < 4) exit 1}'; done && echo 'OK'",
+      "pass": "output.includes('OK')",
+      "confidence": "definitive",
+      "rail": "HARD"
+    },
+    {
+      "check": "Each plan has <tasks> in XML format",
+      "script": "grep -c '<tasks>' .planning/phases/**/*-PLAN.md | awk '{sum+=$1} END {print sum}'",
+      "pass": "parseInt(output) >= 1",
+      "confidence": "definitive",
+      "rail": "HARD"
+    },
+    {
+      "check": "Each plan has must_haves for verification",
+      "script": "grep -c 'must_haves:' .planning/phases/**/*-PLAN.md | awk '{sum+=$1} END {print sum}'",
+      "pass": "parseInt(output) >= 1",
+      "confidence": "definitive",
+      "rail": "HARD"
+    },
+    {
+      "check": "All phase_req_ids appear in at least one plan's requirements field",
+      "script": "/* requires cross-referencing ROADMAP and PLANs */",
+      "pass": "/* use gsd-planner check */",
+      "confidence": "heuristic",
+      "rail": "HARD"
+    },
+    {
+      "check": "gsd-plan-checker returned VERIFICATION PASSED (or override)",
+      "script": "grep -l 'VERIFICATION PASSED' .planning/phases/**/*-PLAN.md || grep 'override' .planning/STATE.md",
+      "pass": "output.length > 0",
+      "confidence": "heuristic",
+      "rail": "SOFT"
+    }
+  ],
+
+  "execute-phase": [
+    {
+      "check": "All plans have SUMMARY.md",
+      "script": "ls .planning/phases/**/*-PLAN.md | wc -l > /tmp/plans.txt && ls .planning/phases/**/*-SUMMARY.md 2>/dev/null | wc -l > /tmp/summaries.txt && diff /tmp/plans.txt /tmp/summaries.txt",
+      "pass": "exitCode === 0",
+      "confidence": "definitive",
+      "rail": "HARD"
+    },
+    {
+      "check": "All spot-checks pass (files exist, commits present, no self-check failures)",
+      "script": "grep -l 'Self-Check: FAILED' .planning/phases/**/*-SUMMARY.md 2>/dev/null | wc -l",
+      "pass": "parseInt(output) === 0",
+      "confidence": "definitive",
+      "rail": "HARD"
+    },
+    {
+      "check": "VERIFICATION.md status is passed or human_needed (not gaps_found)",
+      "script": "grep -E 'status: (passed|human_needed)' .planning/phases/**/*-VERIFICATION.md | wc -l",
+      "pass": "parseInt(output) > 0",
+      "confidence": "definitive",
+      "rail": "SOFT"
+    },
+    {
+      "check": "ROADMAP.md phase checkbox marked [x] with date",
+      "script": "grep -E '\\[x\\].*Phase.*[0-9]{4}-[0-9]{2}-[0-9]{2}' .planning/ROADMAP.md | wc -l",
+      "pass": "parseInt(output) > 0",
+      "confidence": "definitive",
+      "rail": "SOFT"
+    },
+    {
+      "check": "STATE.md advanced to next phase",
+      "script": "grep -E 'current_phase:' .planning/STATE.md",
+      "pass": "output.length > 0",
+      "confidence": "heuristic",
+      "rail": "SOFT"
+    },
+    {
+      "check": "No orphaned branches (if branching used)",
+      "script": "git branch --list | grep -E 'phase-[0-9]+' | while read b; do git log -1 --format='%ci' \"$b\" | grep -v \"$(date +%Y-%m)\" && echo \"ORPHAN: $b\"; done",
+      "pass": "!output.includes('ORPHAN')",
+      "confidence": "heuristic",
+      "rail": "SOFT"
+    }
+  ],
+
+  "verify-phase": [
+    {
+      "check": "Must-haves established (from frontmatter, criteria, or derived)",
+      "script": "grep -cE '(truths|artifacts|key_links):' .planning/phases/**/*-VERIFICATION.md || echo '0'",
+      "pass": "parseInt(output) >= 1",
+      "confidence": "definitive",
+      "rail": "HARD"
+    },
+    {
+      "check": "Every truth has status + evidence",
+      "script": "grep -cE '(VERIFIED|FAILED|UNCERTAIN).*\\|' .planning/phases/**/*-VERIFICATION.md || echo '0'",
+      "pass": "parseInt(output) >= 1",
+      "confidence": "definitive",
+      "rail": "HARD"
+    },
+    {
+      "check": "Every artifact has level 1-3 check result",
+      "script": "grep -E '\\| (Yes|No) \\| (Yes|No) \\| (Yes|No) \\|' .planning/phases/**/*-VERIFICATION.md | wc -l",
+      "pass": "parseInt(output) >= 1",
+      "confidence": "definitive",
+      "rail": "HARD"
+    },
+    {
+      "check": "Every key link has wiring status",
+      "script": "grep -cE '(WIRED|PARTIAL|NOT_WIRED)' .planning/phases/**/*-VERIFICATION.md || echo '0'",
+      "pass": "parseInt(output) >= 0",
+      "confidence": "heuristic",
+      "rail": "SOFT"
+    },
+    {
+      "check": "VERIFICATION.md has structured report",
+      "script": "grep -cE '^## ' .planning/phases/**/*-VERIFICATION.md | awk '{sum+=$1} END {print sum}'",
+      "pass": "parseInt(output) >= 3",
+      "confidence": "definitive",
+      "rail": "HARD"
+    },
+    {
+      "check": "Status is one of: passed, gaps_found, human_needed",
+      "script": "grep -E 'status: (passed|gaps_found|human_needed)' .planning/phases/**/*-VERIFICATION.md | wc -l",
+      "pass": "parseInt(output) >= 1",
+      "confidence": "definitive",
+      "rail": "HARD"
+    },
+    {
+      "check": "Score calculated: N/M must-haves verified",
+      "script": "grep -E 'score: [0-9]+/[0-9]+' .planning/phases/**/*-VERIFICATION.md | wc -l",
+      "pass": "parseInt(output) >= 1",
+      "confidence": "definitive",
+      "rail": "SOFT"
+    },
+    {
+      "check": "Orchestrator can route based on status",
+      "script": "grep -E 'status:' .planning/phases/**/*-VERIFICATION.md",
+      "pass": "output.length > 0",
+      "confidence": "heuristic",
+      "rail": "SOFT"
+    }
+  ],
+
+  "unify-phase": [
+    {
+      "check": "SUMMARY.md created in plan directory",
+      "script": "ls -la .planning/phases/**/SUMMARY.md 2>/dev/null | head -1",
+      "pass": "output.includes('SUMMARY.md')",
+      "confidence": "definitive",
+      "rail": "HARD"
+    },
+    {
+      "check": "Reconciliation table shows PLANNED|ACTUAL|DELTA for all tasks",
+      "script": "grep -cE '\\| PLANNED \\| ACTUAL \\| DELTA \\|' .planning/phases/**/SUMMARY.md || echo '0'",
+      "pass": "parseInt(output) >= 1",
+      "confidence": "definitive",
+      "rail": "HARD"
+    },
+    {
+      "check": "Acceptance criteria results documented with evidence",
+      "script": "grep -cE '(PASS|FAIL).*\\|' .planning/phases/**/SUMMARY.md || echo '0'",
+      "pass": "parseInt(output) >= 1",
+      "confidence": "heuristic",
+      "rail": "SOFT"
+    },
+    {
+      "check": "STATE.md updated with loop closure (UNIFY checkmark)",
+      "script": "grep -E 'UNIFY.*[✓x]' .planning/STATE.md || grep 'UNIFY.*complete' .planning/STATE.md",
+      "pass": "output.length > 0",
+      "confidence": "definitive",
+      "rail": "HARD"
+    },
+    {
+      "check": "Deferred issues captured for future planning",
+      "script": "grep -c '## Deferred' .planning/phases/**/SUMMARY.md || echo '0'",
+      "pass": "parseInt(output) >= 0",
+      "confidence": "heuristic",
+      "rail": "SOFT"
+    },
+    {
+      "check": "User knows what to do next (next plan, phase complete, etc.)",
+      "script": "grep -ciE '(next|complete|done)' .planning/phases/**/SUMMARY.md || echo '0'",
+      "pass": "parseInt(output) >= 1",
+      "confidence": "heuristic",
+      "rail": "SOFT"
+    },
+    {
+      "check": "No orphaned work - everything is documented or explicitly deferred",
+      "script": "/* requires semantic analysis */",
+      "pass": "/* manual verification */",
+      "confidence": "heuristic",
+      "rail": "SOFT"
+    }
+  ],
+
+  "verification-integrity": [
+    {
+      "check": "Test output analyzed for actual execution (not 0 tests, not all skipped)",
+      "script": "npm test 2>&1 | grep -E '[0-9]+ (passed|passing)' | awk '{print $1}'",
+      "pass": "parseInt(output) > 0",
+      "confidence": "definitive",
+      "rail": "HARD"
+    },
+    {
+      "check": "Build output analyzed for hidden errors (not just exit code)",
+      "script": "npm run build 2>&1 | grep -ciE '(error|failed)' || echo '0'",
+      "pass": "parseInt(output) === 0",
+      "confidence": "definitive",
+      "rail": "HARD"
+    },
+    {
+      "check": "Stub patterns searched in all relevant files",
+      "script": "grep -rE '(TODO|FIXME|PLACEHOLDER|return null|return \\{\\}|return \\[\\])' src/ --include='*.ts' --include='*.tsx' | wc -l",
+      "pass": "/* count reported, 0 is ideal */",
+      "confidence": "definitive",
+      "rail": "SOFT"
+    },
+    {
+      "check": "Wiring verified between components",
+      "script": "/* requires component analysis */",
+      "pass": "/* manual verification */",
+      "confidence": "heuristic",
+      "rail": "SOFT"
+    },
+    {
+      "check": "Four-level verification applied (exists, substantive, wired, functional)",
+      "script": "/* requires structured verification */",
+      "pass": "/* manual verification */",
+      "confidence": "heuristic",
+      "rail": "SOFT"
+    },
+    {
+      "check": "Clear verdict: TRUSTWORTHY or NOT TRUSTWORTHY with evidence",
+      "script": "grep -ciE '(trustworthy|not trustworthy)' /tmp/verification_report.txt || echo '0'",
+      "pass": "parseInt(output) >= 1",
+      "confidence": "heuristic",
+      "rail": "HARD"
+    },
+    {
+      "check": "Human verification flagged where automation cannot reach",
+      "script": "grep -ciE 'human.*(verification|needed|required)' /tmp/verification_report.txt || echo '0'",
+      "pass": "parseInt(output) >= 0",
+      "confidence": "heuristic",
+      "rail": "SOFT"
+    }
+  ],
+
+  "docker-local-first": [
+    {
+      "check": "Docker daemon confirmed running",
+      "script": "docker info > /dev/null 2>&1 && echo 'OK'",
+      "pass": "output === 'OK'",
+      "confidence": "definitive",
+      "rail": "HARD"
+    },
+    {
+      "check": "Dockerfile found and valid",
+      "script": "[ -f Dockerfile ] && docker build --check . 2>&1 && echo 'OK'",
+      "pass": "output.includes('OK')",
+      "confidence": "definitive",
+      "rail": "HARD"
+    },
+    {
+      "check": "Build completes with exit code 0",
+      "script": "docker build -t test:local . 2>&1; echo \"EXIT:$?\"",
+      "pass": "output.includes('EXIT:0')",
+      "confidence": "definitive",
+      "rail": "HARD"
+    },
+    {
+      "check": "Container starts and stays running for 3+ seconds",
+      "script": "docker run -d --name test-container test:local && sleep 3 && docker ps -q -f name=test-container | grep -q . && echo 'OK'; docker rm -f test-container",
+      "pass": "output.includes('OK')",
+      "confidence": "definitive",
+      "rail": "HARD"
+    },
+    {
+      "check": "Health endpoint returns HTTP 200 within 30 seconds",
+      "script": "for i in $(seq 1 30); do [ \"$(curl -s -o /dev/null -w '%{http_code}' http://localhost:$PORT/health)\" = '200' ] && echo 'OK' && break; sleep 1; done",
+      "pass": "output.includes('OK')",
+      "confidence": "definitive",
+      "rail": "HARD"
+    },
+    {
+      "check": "Test container cleaned up",
+      "script": "docker ps -a -q -f name=test-container | wc -l",
+      "pass": "parseInt(output) === 0",
+      "confidence": "definitive",
+      "rail": "SOFT"
+    },
+    {
+      "check": "Clear PASSED/FAILED verdict displayed",
+      "script": "/* output verification */",
+      "pass": "/* manual verification */",
+      "confidence": "heuristic",
+      "rail": "SOFT"
+    }
+  ],
+
+  "frontend-design": [
+    {
+      "check": "No emojis used as icons (use SVG instead)",
+      "script": "grep -rE '[\\x{1F300}-\\x{1F9FF}]' src/ --include='*.tsx' --include='*.jsx' | wc -l",
+      "pass": "parseInt(output) === 0",
+      "confidence": "definitive",
+      "rail": "SOFT"
+    },
+    {
+      "check": "All icons from consistent icon set (Heroicons/Lucide)",
+      "script": "grep -rE '(heroicons|lucide-react|@heroicons)' src/ --include='*.tsx' | wc -l",
+      "pass": "parseInt(output) >= 0",
+      "confidence": "heuristic",
+      "rail": "SOFT"
+    },
+    {
+      "check": "Hover states don't cause layout shift",
+      "script": "/* requires visual verification */",
+      "pass": "/* manual verification */",
+      "confidence": "heuristic",
+      "rail": "SOFT"
+    },
+    {
+      "check": "All clickable elements have cursor-pointer",
+      "script": "grep -rE '(onClick|onPress)' src/ --include='*.tsx' -l | xargs grep -L 'cursor-pointer' | wc -l",
+      "pass": "/* lower is better */",
+      "confidence": "heuristic",
+      "rail": "SOFT"
+    },
+    {
+      "check": "Transitions are smooth (150-300ms)",
+      "script": "grep -rE 'transition.*[0-9]+ms' src/ --include='*.tsx' --include='*.css' | grep -vE '(150|200|250|300)ms' | wc -l",
+      "pass": "/* 0 is ideal */",
+      "confidence": "heuristic",
+      "rail": "SOFT"
+    },
+    {
+      "check": "Focus states visible for keyboard navigation",
+      "script": "grep -rE '(focus:|:focus|focus-visible)' src/ --include='*.tsx' --include='*.css' | wc -l",
+      "pass": "parseInt(output) > 0",
+      "confidence": "heuristic",
+      "rail": "HARD"
+    },
+    {
+      "check": "Light mode text has sufficient contrast (4.5:1 minimum)",
+      "script": "/* requires color analysis tool */",
+      "pass": "/* manual verification */",
+      "confidence": "heuristic",
+      "rail": "HARD"
+    },
+    {
+      "check": "Glass/transparent elements visible in light mode",
+      "script": "/* requires visual verification */",
+      "pass": "/* manual verification */",
+      "confidence": "heuristic",
+      "rail": "SOFT"
+    },
+    {
+      "check": "Test both modes before delivery",
+      "script": "/* requires visual verification */",
+      "pass": "/* manual verification */",
+      "confidence": "heuristic",
+      "rail": "HARD"
+    },
+    {
+      "check": "Responsive at 375px, 768px, 1024px, 1440px",
+      "script": "/* requires viewport testing */",
+      "pass": "/* manual verification */",
+      "confidence": "heuristic",
+      "rail": "HARD"
+    },
+    {
+      "check": "No horizontal scroll on mobile",
+      "script": "/* requires viewport testing */",
+      "pass": "/* manual verification */",
+      "confidence": "heuristic",
+      "rail": "HARD"
+    },
+    {
+      "check": "No content hidden behind fixed navbars",
+      "script": "/* requires visual verification */",
+      "pass": "/* manual verification */",
+      "confidence": "heuristic",
+      "rail": "SOFT"
+    }
+  ],
+
+  "pa-comparison": [
+    {
+      "check": "Previous step summary is 2-3 sentences",
+      "script": "grep -A5 'PREVIOUS STEP SUMMARY:' /tmp/pa_handoff.json | wc -l",
+      "pass": "parseInt(output) >= 2 && parseInt(output) <= 5",
+      "confidence": "heuristic",
+      "rail": "SOFT"
+    },
+    {
+      "check": "Output contains action: pass or intervene",
+      "script": "grep -E '\"action\":\\s*\"(pass|intervene)\"' /tmp/pa_handoff.json",
+      "pass": "output.length > 0",
+      "confidence": "definitive",
+      "rail": "HARD"
+    },
+    {
+      "check": "Expected input files exist on disk",
+      "script": "jq -r '.expected_inputs[]' /tmp/pa_handoff.json | while read f; do [ -f \"$f\" ] || echo \"MISSING: $f\"; done",
+      "pass": "!output.includes('MISSING')",
+      "confidence": "definitive",
+      "rail": "HARD"
+    },
+    {
+      "check": "Handoff context populated for pass action",
+      "script": "jq '.action, .handoff_context' /tmp/pa_handoff.json | head -2",
+      "pass": "/* if action=pass, handoff_context must exist */",
+      "confidence": "heuristic",
+      "rail": "SOFT"
+    },
+    {
+      "check": "Intervention includes target executor for intervene action",
+      "script": "jq '.intervention.target_executor' /tmp/pa_handoff.json 2>/dev/null || echo 'null'",
+      "pass": "/* if action=intervene, target_executor must exist */",
+      "confidence": "heuristic",
+      "rail": "SOFT"
+    }
+  ],
+
+  "context-warden": {
+    "_description": "Model-specific token thresholds. Context Warden kills at threshold unless task is >85% complete.",
+    "thresholds": {
+      "claude-sonnet-4": { "window": 200000, "kill_at_percent": 55, "effective_budget": 110000 },
+      "claude-opus-4": { "window": 200000, "kill_at_percent": 65, "effective_budget": 130000 },
+      "gpt-4o": { "window": 128000, "kill_at_percent": 60, "effective_budget": 76800 },
+      "gpt-4o-mini": { "window": 128000, "kill_at_percent": 50, "effective_budget": 64000 },
+      "gemini-pro": { "window": 1000000, "kill_at_percent": 60, "effective_budget": 600000 },
+      "gemini-flash": { "window": 1000000, "kill_at_percent": 50, "effective_budget": 500000 },
+      "default": { "window": 128000, "kill_at_percent": 55, "effective_budget": 70400 }
+    },
+    "grace_period": {
+      "condition": "tokenUsage > threshold AND taskProgress > 0.85",
+      "action": "let_finish",
+      "reason": "killing costs more than letting finish"
+    },
+    "checks": [
+      {
+        "check": "Token count retrieved from model API response",
+        "script": "/* provider-specific: response.usage.total_tokens */",
+        "pass": "typeof tokenCount === 'number'",
+        "confidence": "definitive",
+        "rail": "HARD"
+      },
+      {
+        "check": "Kill threshold not exceeded (or grace period applies)",
+        "script": "/* tokenUsage / window <= kill_at_percent OR taskProgress > 0.85 */",
+        "pass": "(tokenUsage / window) <= killAtPercent || taskProgress > 0.85",
+        "confidence": "definitive",
+        "rail": "HARD"
+      },
+      {
+        "check": "Summary extraction completed before kill",
+        "script": "ls /tmp/agent_summary_*.md | head -1",
+        "pass": "output.includes('.md')",
+        "confidence": "definitive",
+        "rail": "HARD"
+      },
+      {
+        "check": "Fresh agent spawned with summary context",
+        "script": "/* requires process management verification */",
+        "pass": "/* manual verification */",
+        "confidence": "heuristic",
+        "rail": "SOFT"
+      }
+    ]
+  },
+
+  "conductor-system": [
+    {
+      "check": "Tier classification produced (0-3)",
+      "script": "grep -E '\"tier\":\\s*[0-3]' /tmp/conductor_output.json",
+      "pass": "output.length > 0",
+      "confidence": "definitive",
+      "rail": "HARD"
+    },
+    {
+      "check": "DAG JSON is valid and has steps array",
+      "script": "jq '.dag.steps | length' /tmp/conductor_output.json 2>/dev/null",
+      "pass": "parseInt(output) >= 0",
+      "confidence": "definitive",
+      "rail": "HARD"
+    },
+    {
+      "check": "No implementation code in conductor output",
+      "script": "grep -cE '(function|const|let|var|import|export)' /tmp/conductor_output.json || echo '0'",
+      "pass": "parseInt(output) === 0",
+      "confidence": "definitive",
+      "rail": "HARD"
+    },
+    {
+      "check": "Each step has worker assignment",
+      "script": "jq '[.dag.steps[] | select(.worker == null)] | length' /tmp/conductor_output.json",
+      "pass": "parseInt(output) === 0",
+      "confidence": "definitive",
+      "rail": "HARD"
+    },
+    {
+      "check": "No circular dependencies in DAG",
+      "script": "jq '[.dag.steps[] | select(.dependsOn[] as $d | .id <= $d)] | length' /tmp/conductor_output.json 2>/dev/null || echo '0'",
+      "pass": "parseInt(output) === 0",
+      "confidence": "definitive",
+      "rail": "HARD"
+    },
+    {
+      "check": "Max 3 parallel workers enforced",
+      "script": "jq '[.dag.steps | group_by(.dependsOn | length) | .[] | length] | max' /tmp/conductor_output.json 2>/dev/null || echo '0'",
+      "pass": "parseInt(output) <= 3",
+      "confidence": "heuristic",
+      "rail": "SOFT"
+    }
+  ],
+
+  "intake": [
+    {
+      "check": "Structured brief produced as valid JSON",
+      "script": "jq '.brief' /tmp/intake_output.json > /dev/null && echo 'VALID'",
+      "pass": "output.includes('VALID')",
+      "confidence": "definitive",
+      "rail": "HARD"
+    },
+    {
+      "check": "taskType is one of 5 allowed values",
+      "script": "jq -r '.brief.taskType' /tmp/intake_output.json | grep -E '^(build_product|build_content|research|automate|general)$'",
+      "pass": "output.length > 0",
+      "confidence": "definitive",
+      "rail": "HARD"
+    },
+    {
+      "check": "projectName is valid directory name",
+      "script": "jq -r '.brief.projectName' /tmp/intake_output.json | grep -E '^[a-z0-9-]+$'",
+      "pass": "output.length > 0",
+      "confidence": "definitive",
+      "rail": "HARD"
+    },
+    {
+      "check": "No technical jargon in user-facing messages",
+      "script": "grep -ciE '(framework|backend|frontend|api|database|REST|GraphQL|JWT)' /tmp/intake_conversation.txt || echo '0'",
+      "pass": "parseInt(output) === 0",
+      "confidence": "heuristic",
+      "rail": "SOFT"
+    },
+    {
+      "check": "Questions asked <= 5",
+      "script": "grep -c '?' /tmp/intake_conversation.txt || echo '0'",
+      "pass": "parseInt(output) <= 5",
+      "confidence": "heuristic",
+      "rail": "SOFT"
+    }
+  ],
+
+  "archivist": [
+    {
+      "check": "PROJECT-ARCHIVE.md exists and is > 500 bytes",
+      "script": "ls -la PROJECT-ARCHIVE.md 2>/dev/null | awk '{print $5}'",
+      "pass": "parseInt(output) > 500",
+      "confidence": "definitive",
+      "rail": "HARD"
+    },
+    {
+      "check": "All required sections present",
+      "script": "grep -cE '^## (Summary|Features|Tech Stack|Architecture|Lessons|Known Issues)' PROJECT-ARCHIVE.md",
+      "pass": "parseInt(output) >= 5",
+      "confidence": "definitive",
+      "rail": "HARD"
+    },
+    {
+      "check": "Tech stack matches package.json",
+      "script": "grep -A10 '## Tech Stack' PROJECT-ARCHIVE.md | grep -oE '(next|react|vue|svelte)' | head -1 > /tmp/arch_stack.txt && grep -oE '(next|react|vue|svelte)' package.json | head -1 > /tmp/pkg_stack.txt && diff /tmp/arch_stack.txt /tmp/pkg_stack.txt",
+      "pass": "exitCode === 0",
+      "confidence": "definitive",
+      "rail": "HARD"
+    },
+    {
+      "check": "Every lesson has 4 required fields",
+      "script": "grep -cE '(What broke|Root cause|Fix applied|Prevention)' PROJECT-ARCHIVE.md",
+      "pass": "parseInt(output) % 4 === 0 && parseInt(output) > 0",
+      "confidence": "heuristic",
+      "rail": "SOFT"
+    },
+    {
+      "check": "llms.txt exists if project has HTML output",
+      "script": "if ls dist/*.html 2>/dev/null || ls public/*.html 2>/dev/null; then ls llms.txt; fi",
+      "pass": "/* llms.txt required if HTML exists */",
+      "confidence": "heuristic",
+      "rail": "SOFT"
+    },
+    {
+      "check": "No placeholder text remaining",
+      "script": "grep -ciE '(TODO|PLACEHOLDER|TBD|FILL IN)' PROJECT-ARCHIVE.md || echo '0'",
+      "pass": "parseInt(output) === 0",
+      "confidence": "definitive",
+      "rail": "HARD"
+    }
+  ],
+
+  "worker-scaffold": [
+    {
+      "check": "Project directory created",
+      "script": "[ -d \"$PROJECT_DIR\" ] && echo 'EXISTS'",
+      "pass": "output === 'EXISTS'",
+      "confidence": "definitive",
+      "rail": "HARD"
+    },
+    {
+      "check": "package.json is valid JSON",
+      "script": "jq . $PROJECT_DIR/package.json > /dev/null && echo 'VALID'",
+      "pass": "output.includes('VALID')",
+      "confidence": "definitive",
+      "rail": "HARD"
+    },
+    {
+      "check": "git repository initialized",
+      "script": "[ -d \"$PROJECT_DIR/.git\" ] && echo 'GIT_INIT'",
+      "pass": "output === 'GIT_INIT'",
+      "confidence": "definitive",
+      "rail": "HARD"
+    },
+    {
+      "check": ".gitignore exists and covers node_modules",
+      "script": "grep -q 'node_modules' $PROJECT_DIR/.gitignore && echo 'OK'",
+      "pass": "output === 'OK'",
+      "confidence": "definitive",
+      "rail": "HARD"
+    },
+    {
+      "check": "src/ directory created",
+      "script": "[ -d \"$PROJECT_DIR/src\" ] && echo 'SRC_EXISTS'",
+      "pass": "output === 'SRC_EXISTS'",
+      "confidence": "definitive",
+      "rail": "HARD"
+    },
+    {
+      "check": "npm install completes without error",
+      "script": "cd $PROJECT_DIR && npm install 2>&1; echo \"EXIT:$?\"",
+      "pass": "output.includes('EXIT:0')",
+      "confidence": "definitive",
+      "rail": "HARD"
+    },
+    {
+      "check": "README.md exists with project name",
+      "script": "grep -q \"$PROJECT_NAME\" $PROJECT_DIR/README.md && echo 'OK'",
+      "pass": "output === 'OK'",
+      "confidence": "heuristic",
+      "rail": "SOFT"
+    }
+  ],
+
+  "worker-backend": [
+    {
+      "check": "No hardcoded secrets in source",
+      "script": "grep -rE '(sk-[a-zA-Z0-9]{20,}|password\\s*=\\s*[\"'][^\"']+[\"']|api_key\\s*=\\s*[\"'][^\"']+[\"'])' src/ --include='*.ts' | grep -v 'process.env' | wc -l",
+      "pass": "parseInt(output) === 0",
+      "confidence": "definitive",
+      "rail": "HARD"
+    },
+    {
+      "check": "All routes have input validation",
+      "script": "for f in src/routes/*.ts src/api/*.ts; do grep -L '(zod|yup|joi|validate)' \"$f\" 2>/dev/null; done | wc -l",
+      "pass": "parseInt(output) === 0",
+      "confidence": "heuristic",
+      "rail": "HARD"
+    },
+    {
+      "check": "Environment variables use process.env",
+      "script": "grep -rE '(DATABASE_URL|API_KEY|SECRET)' src/ --include='*.ts' | grep -v 'process.env' | wc -l",
+      "pass": "parseInt(output) === 0",
+      "confidence": "definitive",
+      "rail": "HARD"
+    },
+    {
+      "check": "Error responses don't expose stack traces",
+      "script": "grep -rE 'res\\.(json|send).*stack' src/ --include='*.ts' | wc -l",
+      "pass": "parseInt(output) === 0",
+      "confidence": "definitive",
+      "rail": "HARD"
+    },
+    {
+      "check": "Database queries use parameterization",
+      "script": "grep -rE '\\$\\{.*\\}.*SELECT|INSERT.*\\$\\{' src/ --include='*.ts' | grep -v '\\$[0-9]' | wc -l",
+      "pass": "parseInt(output) === 0",
+      "confidence": "heuristic",
+      "rail": "HARD"
+    },
+    {
+      "check": "Routes return proper HTTP status codes",
+      "script": "grep -rE 'res\\.status\\([0-9]{3}\\)' src/ --include='*.ts' | wc -l",
+      "pass": "parseInt(output) > 0",
+      "confidence": "heuristic",
+      "rail": "SOFT"
+    },
+    {
+      "check": "Auth middleware protects private routes",
+      "script": "grep -rE '(requireAuth|isAuthenticated|verifyToken)' src/routes/*.ts src/api/*.ts 2>/dev/null | wc -l",
+      "pass": "/* should be > 0 if auth required */",
+      "confidence": "heuristic",
+      "rail": "SOFT"
+    }
+  ],
+
+  "tiered-enforcement": {
+    "_description": "Overhead budgets per tier. Keeps enforcement cost proportional to task complexity.",
+    "tiers": {
+      "tier_0": {
+        "name": "Trivial",
+        "duration": "<1 minute",
+        "agents": "None (fast-path regex)",
+        "overhead_target": "50ms",
+        "overhead_percent": "~0%"
+      },
+      "tier_1": {
+        "name": "Simple",
+        "duration": "1-5 minutes",
+        "agents": "1 Worker + Bodyguard (post-completion only)",
+        "overhead_target": "3-5s",
+        "overhead_percent": "5-10%"
+      },
+      "tier_2": {
+        "name": "Medium",
+        "duration": "5-30 minutes",
+        "agents": "Bodyguard + Scope Enforcer + Skill Injector",
+        "overhead_target": "30-60s total",
+        "overhead_percent": "5-10%"
+      },
+      "tier_3": {
+        "name": "Complex",
+        "duration": "30+ minutes",
+        "agents": "Full nervous system (all actors)",
+        "overhead_target": "2-4 minutes total",
+        "overhead_percent": "6-9%"
+      }
+    }
+  }
+}

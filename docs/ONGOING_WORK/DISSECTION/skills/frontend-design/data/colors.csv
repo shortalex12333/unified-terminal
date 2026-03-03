@@ -1,0 +1,11 @@
+Product Type,Primary (Hex),Secondary (Hex),CTA (Hex),Background (Hex),Text (Hex),Notes
+SaaS Dashboard,#3B82F6,#10B981,#F59E0B,#FFFFFF,#1F2937,Blue primary conveys trust and professionalism
+E-commerce,#7C3AED,#EC4899,#F97316,#FFFFFF,#111827,Purple for luxury feel with vibrant CTAs
+Healthcare,#059669,#0891B2,#DC2626,#F0FDF4,#064E3B,Green conveys health and calm with urgent red CTA
+Fintech,#1E40AF,#047857,#16A34A,#F8FAFC,#0F172A,Deep blue for trust and green for positive money
+Beauty Spa,#DB2777,#A855F7,#F472B6,#FDF2F8,#831843,Pink palette for feminine and luxurious feel
+Gaming,#7C3AED,#EC4899,#22D3EE,#0F0F23,#E5E7EB,Vibrant colors on dark background
+Developer Tools,#6366F1,#22D3EE,#A855F7,#0F172A,#E2E8F0,Dark mode default with accent colors
+Portfolio,#000000,#6B7280,#3B82F6,#FFFFFF,#111827,Minimal palette lets work shine
+Real Estate,#0D9488,#0284C7,#F59E0B,#FFFFFF,#1E3A5F,Teal conveys trust and luxury
+Education,#2563EB,#7C3AED,#F59E0B,#EFF6FF,#1E3A8A,Blue for learning with warm accents
