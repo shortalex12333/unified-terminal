@@ -1,0 +1,35 @@
+{
+  "skill": "build-artifact-enforcement",
+  "description": "Verify build artifacts exist and contain required output files",
+  "checks": [
+    {
+      "id": 7,
+      "name": "build-artifact",
+      "label": "Build Artifact Verification",
+      "description": "Verify dist/ directory contains .html, .js, and .css files after build",
+      "script": "checks/check_build_artifact.py",
+      "pass": "dist/ exists and contains index.html, bundle.js, and styles.css files",
+      "confidence": "definitive",
+      "when": "after build step completes",
+      "retries": {
+        "attempts": 1,
+        "delayMs": 0
+      },
+      "timeout": 10000,
+      "optional": false,
+      "tier": 1,
+      "phase": "post-step"
+    }
+  ],
+  "activation": {
+    "triggers": ["post_build"],
+    "tiers": [0, 1, 2, 3],
+    "skipConditions": []
+  },
+  "failure": {
+    "severity": "error",
+    "userMessage": "Build artifacts missing or incomplete. Verify npm build ran successfully and generated output files in dist/.",
+    "allowSkip": false,
+    "options": ["Retry", "Stop build"]
+  }
+}

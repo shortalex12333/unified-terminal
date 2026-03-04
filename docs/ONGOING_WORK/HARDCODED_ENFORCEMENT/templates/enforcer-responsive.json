@@ -1,0 +1,38 @@
+{
+  "skill": "responsive-design-enforcement",
+  "description": "Verify responsive design works at multiple viewport sizes",
+  "checks": [
+    {
+      "id": 11,
+      "name": "responsive",
+      "label": "Responsive Design Check",
+      "description": "Capture screenshots at mobile (375px), tablet (768px), and desktop (1920px) viewports using Playwright",
+      "script": "checks/check_responsive.py",
+      "pass": "Playwright successfully captures screenshots at all 3 viewports (mobile, tablet, desktop)",
+      "confidence": "definitive",
+      "when": "after UI component changes",
+      "retries": {
+        "attempts": 1,
+        "delayMs": 0
+      },
+      "timeout": 45000,
+      "optional": false,
+      "tier": 2,
+      "phase": "post-step"
+    }
+  ],
+  "activation": {
+    "triggers": ["post_ui_change"],
+    "tiers": [1, 2, 3],
+    "skipConditions": [
+      "no UI components modified",
+      "playwright not installed"
+    ]
+  },
+  "failure": {
+    "severity": "error",
+    "userMessage": "Responsive design validation failed. Screenshots could not be captured at all required viewports. Verify UI components render correctly at mobile, tablet, and desktop sizes.",
+    "allowSkip": false,
+    "options": ["Retry", "Stop build"]
+  }
+}
