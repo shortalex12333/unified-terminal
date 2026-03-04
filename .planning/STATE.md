@@ -1,7 +1,7 @@
 # Unified Terminal — Project State
 
 ## Current Phase: 10 (E2E Validation)
-## Current Plan: 1 of 1
+## Current Plan: 2 of 3
 ## Status: IN PROGRESS
 ## Mode: EXECUTION
 
@@ -90,6 +90,8 @@ Phase progress tracked in `.planning/phases/` directories and `ROADMAP.md`.
 - Removed broken conductor:user-decision handler; renderer uses sendStepDecision() via preload bridge
 - CircuitBreakerModal uses inline styles (not Tailwind) per CLAUDE.md minimal frontend directive
 - Phase 9 Plan 02 checkpoint auto-approved; manual verification deferred to Phase 10 E2E
+- Session resume tested via capabilities() report; AgentConfig lacks sessionId field
+- Production readiness script uses structural/static checks only (no slow test suite runs)
 
 ## Quick Tasks Completed
 
@@ -102,3 +104,4 @@ Phase progress tracked in `.planning/phases/` directories and `ROADMAP.md`.
 | 2026-03-04 | Phase 8 Plan 01: Integration test (23/23 passing) | de2d362 |
 | 2026-03-04 | Phase 9 Plan 01: Circuit breaker IPC wiring + confidence-aware filtering | 26d0afa, c6b0c0a |
 | 2026-03-04 | Phase 9 Plan 02: CircuitBreakerModal component + IPC types + App wiring | b260c4c |
+| 2026-03-04 | Phase 10 Plan 02: Compatibility matrix (4/4) + production readiness script (13 checks) | 335f51c, d692fe0 |
