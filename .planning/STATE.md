@@ -1,8 +1,8 @@
 # Unified Terminal — Project State
 
 ## Current Phase: 8 (Integration Test)
-## Status: PLANNED
-## Mode: PLANNING
+## Status: COMPLETE
+## Mode: EXECUTION
 
 Phase progress tracked in `.planning/phases/` directories and `ROADMAP.md`.
 
@@ -18,12 +18,13 @@ Phase progress tracked in `.planning/phases/` directories and `ROADMAP.md`.
 - `tests/claude-adapter.test.ts` — 8 unit tests, all passing (commit b0ed68a)
 - `tsc --noEmit` — zero errors
 
-## Codebase Stats (Post Phase 6)
+## Codebase Stats (Post Phase 8)
 
-- **New files created:** 21 (19 from phases 1-6 + 2 from phase 7)
-- **Total lines added:** ~4,000
-- **TypeScript errors:** 0 (last checked)
-- **Existing tests:** 444+ passing (pre-integration)
+- **New files created:** 22 (19 from phases 1-6 + 2 from phase 7 + 1 from phase 8)
+- **Total lines added:** ~5,000
+- **TypeScript errors:** 0 (last checked: 2026-03-04)
+- **Existing tests:** 444+ unit tests + 23 integration tests
+- **Integration tests:** 23/23 passing (conductor-scheduler-executor.test.ts)
 - **Score:** 95/100 (per code review)
 
 ## Files Created (All Phases)
@@ -57,6 +58,9 @@ Phase progress tracked in `.planning/phases/` directories and `ROADMAP.md`.
 - `normalizer.ts` — Raw output → GateCheckInput
 - `index.ts` — Barrel exports
 
+### tests/integration/ (1 file — Phase 8)
+- `conductor-scheduler-executor.test.ts` — Full pipeline integration test (1005 lines, 23 tests)
+
 ## Modified Files
 
 - `src/main/step-scheduler.ts` — 10-step enforcement flow + buildDagProgress()
@@ -68,10 +72,10 @@ Phase progress tracked in `.planning/phases/` directories and `ROADMAP.md`.
 |----|-------------|-------|--------|
 | GAP-001 | COMPATIBILITY map: 17/28 skills | Phase 7 | RESOLVED (29 entries) |
 | GAP-002 | Claude adapter tests not written | Phase 7 | RESOLVED (b0ed68a) |
-| GAP-003 | Conductor→Scheduler→Executor not integration tested | Phase 8 | Pending |
+| GAP-003 | Conductor→Scheduler→Executor not integration tested | Phase 8 | RESOLVED (de2d362) |
 | GAP-004 | Circuit breaker user escalation not wired | Phase 9 | Pending |
 | GAP-005 | No E2E tests for enforcement pipeline | Phase 10 | Pending |
-| GAP-006 | Send interceptor not integration tested | Phase 8 | Pending |
+| GAP-006 | Send interceptor not integration tested | Phase 8 | RESOLVED (de2d362) |
 
 ## Key Decisions
 
@@ -80,6 +84,7 @@ Phase progress tracked in `.planning/phases/` directories and `ROADMAP.md`.
 - Agent-based skill selection is PRIMARY; keyword matching is FALLBACK
 - 28 skills from DISSECTION (not 17) must be in COMPATIBILITY map
 - GSD phase directories created for proper workflow tracking
+- Enforcer mock needed in integration tests: file-existence check has definitive confidence, missing Python scripts cause HARD_FAIL that blocks execution
 
 ## Quick Tasks Completed
 
@@ -89,3 +94,4 @@ Phase progress tracked in `.planning/phases/` directories and `ROADMAP.md`.
 | 2026-03-04 | Fix P2 DAG progress wiring (step-scheduler.ts) | — |
 | 2026-03-04 | GSD restructure: create .planning/phases/ with PLAN+SUMMARY for phases 1-6 | — |
 | 2026-03-04 | Phase 7 Plan 01: Claude adapter tests (8/8 passing) | b0ed68a |
+| 2026-03-04 | Phase 8 Plan 01: Integration test (23/23 passing) | de2d362 |
