@@ -156,9 +156,15 @@ import {
   getStepScheduler,
   cleanupStepScheduler,
   RuntimeStep,
+  CircuitBreakerOptions,
 } from './step-scheduler';
 import { getRateLimitRecovery, cleanupRateLimitRecovery } from './rate-limit-recovery';
 import { installInterceptor, setupInterceptorIPC } from './send-interceptor';
+
+// Executors (Phase 2: Wire into step-scheduler)
+import { getCLIExecutor, cleanupCLIExecutor as cleanupCLIExec } from './executors/cli-executor';
+import { createWebExecutor } from './executors/web-executor';
+import { getServiceExecutor, cleanupServiceExecutor } from './executors/service-executor';
 
 // ============================================================================
 // CONSTANTS
@@ -741,6 +747,43 @@ app.whenReady().then(() => {
 
   // Set up Conductor IPC handlers
   setupConductorIPC();
+
+  // Register executors with step-scheduler (Phase 2: Executor Wiring)
+  const scheduler = getStepScheduler();
+  scheduler.setMainWindow(mainWindow!);
+  const cliExecutor = getCLIExecutor();
+  const serviceExecutor = getServiceExecutor();
+  serviceExecutor.setMainWindow(mainWindow!);
+
+  scheduler.registerExecutor('cli', {
+    execute: async (step, context) => cliExecutor.execute({
+      id: String(step.id),
+      action: step.action as any,
+      detail: step.detail,
+      projectDir: context?.projectDir || process.cwd(),
+    }),
+    canHandle: (step) => step.target === 'cli',
+  });
+  scheduler.registerExecutor('service', {
+    execute: async (step) => serviceExecutor.execute({
+      id: String(step.id),
+      action: step.action as any,
+    }),
+    canHandle: (step) => step.target === 'service',
+  });
+  // WebExecutor registered lazily when chatGPTView is available
+  if (chatGPTView) {
+    const webExecutor = createWebExecutor(chatGPTView);
+    scheduler.registerExecutor('web', {
+      execute: async (step) => webExecutor.execute({
+        id: String(step.id),
+        prompt: step.detail,
+        action: step.action as any,
+      }),
+      canHandle: (step) => step.target === 'web',
+    });
+  }
+  console.log('[App] Executors registered with step-scheduler');
 
   // macOS: Re-create window when dock icon is clicked
   app.on('activate', () => {
@@ -1838,6 +1881,13 @@ function setupConductorIPC(): void {
     }
   });
 
+  // Forward circuit breaker events to renderer
+  scheduler.on('step-needs-user', (options: CircuitBreakerOptions) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('step:needs-user', options);
+    }
+  });
+
   // Forward rate limit events
   rateLimitRecovery.on('rate-limited', () => {
     if (mainWindow && !mainWindow.isDestroyed()) {
@@ -1954,23 +2004,11 @@ ipcMain.handle('conductor:reset', async (): Promise<void> => {
   await conductor.resetSession();
 });
 
-/**
- * IPC: Handle user decision for circuit breaker
- * User decisions are handled via the step:user-decision IPC channel
- * which is already set up in the step-scheduler
- */
-ipcMain.handle('conductor:user-decision', async (
-  _event,
-  stepId: number,
-  decision: 'retry' | 'skip' | 'stop'
-): Promise<void> => {
-  console.log(`[IPC] conductor:user-decision called: step ${stepId} = ${decision}`);
-  // The step scheduler listens for 'step:user-decision' IPC events directly
-  // Forward to that channel
-  if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.webContents.send('step:user-decision', { stepId, decision });
-  }
-});
+// NOTE: conductor:user-decision handler REMOVED (Phase 9, Plan 01)
+// It was broken: used webContents.send() which sends decision BACK to renderer
+// instead of resolving the scheduler's internal Promise.
+// Correct path: renderer -> window.electronAPI.sendStepDecision() ->
+//   ipcRenderer.invoke('step:user-decision') -> scheduler's ipcMain.handle()
 
 // ============================================================================
 // BACKGROUND CLI IPC HANDLERS (Gate 17)
