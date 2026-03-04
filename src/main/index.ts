@@ -167,6 +167,23 @@ import { createWebExecutor } from './executors/web-executor';
 import { getServiceExecutor, cleanupServiceExecutor } from './executors/service-executor';
 
 // ============================================================================
+// TEST MODE FLAG
+// ============================================================================
+
+/**
+ * When --test-mode is passed, the app skips:
+ * - ChatGPT BrowserView creation (no real login needed)
+ * - Auto-updater initialization
+ * - Tray icon creation
+ * This allows E2E tests to launch the Electron shell without side effects.
+ */
+export const isTestMode = process.argv.includes('--test-mode');
+
+if (isTestMode) {
+  console.log('[App] Running in TEST MODE -- skipping ChatGPT, updater, tray');
+}
+
+// ============================================================================
 // CONSTANTS
 // ============================================================================
 
@@ -665,40 +682,44 @@ app.whenReady().then(() => {
   initializePluginSystem();
   setupPluginIPC();
 
-  // Initialize auto-updater (Gate 12)
-  setupUpdaterIPC(() => mainWindow);
-  if (mainWindow) {
-    const updater = getUpdater();
-    updater.setMainWindow(mainWindow);
+  // Initialize auto-updater (Gate 12) -- skip in test mode
+  if (!isTestMode) {
+    setupUpdaterIPC(() => mainWindow);
+    if (mainWindow) {
+      const updater = getUpdater();
+      updater.setMainWindow(mainWindow);
+    }
+    // Check for updates after 5 second delay (let app settle)
+    checkForUpdatesAfterDelay(5000);
   }
-  // Check for updates after 5 second delay (let app settle)
-  checkForUpdatesAfterDelay(5000);
 
   // Initialize state manager and tray (Gate 11)
   const stateManager = getStateManager();
   setupStateIPC();
 
-  // Initialize tray icon
-  const trayManager = getTrayManager();
-  if (mainWindow) {
-    trayManager.create(mainWindow);
+  // Initialize tray icon -- skip in test mode
+  if (!isTestMode) {
+    const trayManager = getTrayManager();
+    if (mainWindow) {
+      trayManager.create(mainWindow);
 
-    // Handle minimize to tray
-    mainWindow.on('minimize', () => {
-      const settings = stateManager.getSettings();
-      if (settings.minimizeToTray && trayManager.isCreated()) {
-        mainWindow?.hide();
-      }
-    });
+      // Handle minimize to tray
+      mainWindow.on('minimize', () => {
+        const settings = stateManager.getSettings();
+        if (settings.minimizeToTray && trayManager.isCreated()) {
+          mainWindow?.hide();
+        }
+      });
 
-    // Handle close to tray (macOS behavior)
-    mainWindow.on('close', (event) => {
-      const settings = stateManager.getSettings();
-      if (settings.minimizeToTray && trayManager.isCreated() && !(app as any).isQuitting) {
-        event.preventDefault();
-        mainWindow?.hide();
-      }
-    });
+      // Handle close to tray (macOS behavior)
+      mainWindow.on('close', (event) => {
+        const settings = stateManager.getSettings();
+        if (settings.minimizeToTray && trayManager.isCreated() && !(app as any).isQuitting) {
+          event.preventDefault();
+          mainWindow?.hide();
+        }
+      });
+    }
   }
 
   // Forward state manager task events to renderer
@@ -708,13 +729,16 @@ app.whenReady().then(() => {
     }
   });
 
-  // Handle tray events
-  trayManager.on('show-window', () => {
-    if (mainWindow) {
-      mainWindow.show();
-      mainWindow.focus();
-    }
-  });
+  // Handle tray events -- only when tray was created (not in test mode)
+  if (!isTestMode) {
+    const tray = getTrayManager();
+    tray.on('show-window', () => {
+      if (mainWindow) {
+        mainWindow.show();
+        mainWindow.focus();
+      }
+    });
+  }
 
   // Check for interrupted tasks on startup
   const interruptedTasks = stateManager.getInterruptedTasks();

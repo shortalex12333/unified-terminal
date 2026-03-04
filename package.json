@@ -12,7 +12,12 @@
     "build:renderer": "vite build",
     "dist:mac": "npm run build && electron-builder --mac",
     "dist:mac:arm64": "npm run build && electron-builder --mac --arm64",
-    "dist:mac:x64": "npm run build && electron-builder --mac --x64"
+    "dist:mac:x64": "npm run build && electron-builder --mac --x64",
+    "test:unit": "npx ts-node tests/task-router.test.ts && npx ts-node tests/intake.test.ts && npx ts-node tests/cli-runner.test.ts && npx ts-node tests/system-scanner.test.ts && npx ts-node tests/codex-adapter.test.ts && npx ts-node tests/fast-path.test.ts && npx ts-node tests/conductor.test.ts && npx ts-node tests/step-scheduler.test.ts && npx ts-node tests/cli-auth.test.ts && npx ts-node tests/claude-adapter.test.ts",
+    "test:integration": "npx ts-node tests/integration/conductor-scheduler-executor.test.ts",
+    "test:e2e": "npx ts-node tests/e2e/electron-dispatch.test.ts",
+    "test:compat": "npx ts-node tests/compatibility-matrix-validation.ts",
+    "test:all": "npm run test:unit && npm run test:integration && npm run test:e2e && npm run test:compat"
   },
   "devDependencies": {
     "@electron/notarize": "^2.2.1",
@@ -24,6 +29,7 @@
     "concurrently": "^9.2.1",
     "electron": "^29.4.6",
     "electron-builder": "^24.13.3",
+    "playwright": "^1.58.2",
     "postcss": "^8.5.8",
     "tailwindcss": "^4.2.1",
     "ts-node": "^10.9.2",
