@@ -1,22 +1,44 @@
 # Kenoki Design Tokens — Complete Reference
 
-## Brand Gradient (Logo/Hero Only)
+## Brand Fonts
+
+| Font | File | Use |
+|------|------|-----|
+| Bumbbled Regular | `fonts/Bumbbled.otf` | Logo only |
+| Eloquia Display Light | `fonts/Eloquia-Display-Light.otf` | Subheaders, taglines |
+| Poppins Regular | `fonts/Poppins-Regular.ttf` | Buttons, UI text |
+
+**Location:** `src/renderer/fonts/`
+
+---
+
+## Brand Gradient (Logo Only)
 
 ```
-#C7A6D8 → #D9A6C7 → #EAA7B6 → #F1A8A6
-Lavender → Mauve → Dusty Rose → Warm Peach
+#e6c3df → #fcc5cb @135°
+Pink Lavender → Soft Coral
 ```
 
-**Usage:** Logo, hero elements, marketing
+**Token:** `--kenoki-gradient`
+**Usage:** Logo text only
 **Avoid:** Small UI elements, body text, buttons
 
 ---
 
-## Accent Blue (Interactions Only)
+## Primary Blue (Buttons)
 
 | Token | Value | Use |
 |-------|-------|-----|
-| `--kenoki-accent` | `#ACCBEE` | Buttons, links, focus states |
+| `--kenoki-primary` | `#1b70db` | Primary buttons |
+| `--kenoki-primary-hover` | `#1560c0` | Button hover state |
+
+---
+
+## Accent Blue (Interactions)
+
+| Token | Value | Use |
+|-------|-------|-----|
+| `--kenoki-accent` | `#ACCBEE` | Links, focus states |
 | `--kenoki-accent-hover` | `#9FC2EA` | Hover state |
 | `--kenoki-accent-soft` | `rgba(172,203,238,0.08)` | Subtle backgrounds |
 | `--kenoki-accent-border` | `rgba(172,203,238,0.15)` | Borders |
@@ -37,7 +59,7 @@ Lavender → Mauve → Dusty Rose → Warm Peach
 
 | Token | Value | Use |
 |-------|-------|-----|
-| `--kenoki-bg` | `#E8EDF5` | Page background |
+| `--kenoki-bg` | `#e7f0fd` | Page background |
 | `--kenoki-surface` | `#FFFFFF` | Cards, panels |
 | `--kenoki-border` | `#E4E4E7` | Borders |
 | `--kenoki-text` | `#1D1D1F` | Primary text |
@@ -96,25 +118,56 @@ Lavender → Mauve → Dusty Rose → Warm Peach
 
 ---
 
-## Typography
+## File Structure
 
-```css
---kenoki-font: 'SF Pro Display', 'SF Pro Text', -apple-system, system-ui, sans-serif;
+```
+src/renderer/
+├── fonts/
+│   ├── Bumbbled.otf           # Logo font
+│   ├── Eloquia-Display-Light.otf  # Subheader font
+│   └── Poppins-Regular.ttf    # Button/UI font
+├── fonts.css                  # @font-face declarations
+├── tokens.css                 # CSS variables
+├── styles.css                 # Global styles (imports fonts + tokens)
+└── components/
+    ├── StartingScreen.tsx     # Light theme - launch
+    ├── ProfilePicker.tsx      # Light theme - provider select
+    ├── ProgressTree.tsx       # Dark theme - build progress
+    └── AppShell.tsx           # Dark theme - overlay shell
 ```
 
 ---
 
-## Usage in Components
+## StartingScreen Specs
+
+| Element | Font | Color | Notes |
+|---------|------|-------|-------|
+| Logo "Kenoki" | Bumbbled Regular | Gradient | 96px |
+| Tagline | Eloquia Display Light | #1d1d1f | 20px |
+| Begin button | Poppins Regular | #ffffff on #1b70db | Pill radius |
+| Background | — | #e7f0fd | Full viewport |
+
+---
+
+## Usage Example
 
 ```tsx
-// Apply theme class to container
-<div className="theme-dark">
-  <div style={{
-    background: 'var(--kenoki-bg)',
-    color: 'var(--kenoki-text)',
-    borderRadius: 'var(--kenoki-radius-md)',
+// StartingScreen uses light theme
+<div className="theme-light">
+  <h1 style={{
+    fontFamily: "'Bumbbled', cursive",
+    background: 'var(--kenoki-gradient)',
+    WebkitBackgroundClip: 'text',
   }}>
-    Content
-  </div>
+    Kenoki
+  </h1>
+
+  <button style={{
+    fontFamily: "'Poppins', sans-serif",
+    background: 'var(--kenoki-primary)',
+    color: '#ffffff',
+  }}>
+    Begin
+  </button>
 </div>
 ```
