@@ -1,27 +1,22 @@
 # Unified Terminal — Project State
 
-## Current Phase: 7 (Claude Code Translator)
-## Status: COMPLETE
-## Mode: EXECUTION
+## Current Phase: 8 (Integration Test)
+## Status: PLANNED
+## Mode: PLANNING
 
 Phase progress tracked in `.planning/phases/` directories and `ROADMAP.md`.
 
 ---
 
-## What Exists (Phase 7 — Partial)
+## What Exists (Phase 7 — Complete)
 
-Code written but not yet complete:
 - `src/adapters/claude/adapter.ts` — Claude CLI adapter (433 lines)
 - `src/adapters/claude/frontmatter.ts` — YAML frontmatter generation (105 lines)
 - `src/adapters/factory.ts` — Updated with Claude adapter registration
 - `src/adapters/types.ts` — Runtime type includes 'claude'
-
-**Phase 7 Plan 01 completed:**
+- `src/adapters/permissions.ts` — 29-skill COMPATIBILITY map (28 DISSECTION + architecture-reviewer)
 - `tests/claude-adapter.test.ts` — 8 unit tests, all passing (commit b0ed68a)
 - `tsc --noEmit` — zero errors
-
-**Remaining gaps (deferred to future phases):**
-- `src/adapters/permissions.ts` — COMPATIBILITY map has 17 entries, needs 28 (per DISSECTION INDEX.md)
 
 ## Codebase Stats (Post Phase 6)
 
@@ -38,7 +33,7 @@ Code written but not yet complete:
 - `codex/adapter.ts` — Codex CLI translator
 - `claude/adapter.ts` — Claude Code CLI translator (Phase 7)
 - `claude/frontmatter.ts` — YAML frontmatter generation (Phase 7)
-- `permissions.ts` — Tool permissions + plugin compat (17/28 skills)
+- `permissions.ts` — Tool permissions + plugin compat (29 skills)
 - `factory.ts` — Adapter factory + runtime selection
 
 ### src/enforcement/ (6 files)
@@ -71,7 +66,7 @@ Code written but not yet complete:
 
 | ID | Description | Phase | Status |
 |----|-------------|-------|--------|
-| GAP-001 | COMPATIBILITY map: 17/28 skills | Phase 7 | Blocking |
+| GAP-001 | COMPATIBILITY map: 17/28 skills | Phase 7 | RESOLVED (29 entries) |
 | GAP-002 | Claude adapter tests not written | Phase 7 | RESOLVED (b0ed68a) |
 | GAP-003 | Conductor→Scheduler→Executor not integration tested | Phase 8 | Pending |
 | GAP-004 | Circuit breaker user escalation not wired | Phase 9 | Pending |

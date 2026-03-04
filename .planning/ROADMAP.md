@@ -33,31 +33,9 @@
 **Summary:** All P0 fixed, agent-based skill selector, timeout/DAG wiring — 95/100 score
 
 ### Phase 7: Claude Code Translator
-**Status:** In Progress
+**Status:** Complete
 **Goal:** Build `src/adapters/claude/adapter.ts` — spawn `claude` as child process with YAML frontmatter, tool name translation, output parsing. Expand permissions.ts COMPATIBILITY from 17 to 28 skills per DISSECTION spec.
-**Plans:** 1 plan
-
-Plans:
-- [ ] 07-01-PLAN.md — Claude adapter tests (8 tests) + phase summary
-
-**Source of Truth:** `docs/ONGOING_WORK/ADAPTORS/INSTANCE-2-ADAPTERS.md` Phase 2, `docs/ONGOING_WORK/DISSECTION/INDEX.md`
-
-**Key Deliverables:**
-- `src/adapters/claude/adapter.ts` (~200 lines)
-- `src/adapters/claude/frontmatter.ts` (YAML generation)
-- Update `src/adapters/factory.ts` to register Claude runtime
-- Update `src/adapters/types.ts` to add 'claude' to Runtime type
-- Update `src/adapters/permissions.ts` — expand to 28 skills from DISSECTION
-- `tests/claude-adapter.test.ts` (4+ tests)
-
-**Acceptance Criteria:**
-1. `getAdapter('claude')` returns working ClaudeAdapter
-2. YAML frontmatter generated with correct tool names (Read, Write, Bash)
-3. Temp agent file created and cleaned up after execution
-4. Output parsed from stdout into AgentResult
-5. COMPATIBILITY map has 28 entries matching DISSECTION INDEX.md
-6. `tsc --noEmit` passes with zero errors
-7. All tests pass
+**Summary:** Claude adapter (433 lines) + frontmatter (105 lines) + factory registration + 29-skill COMPATIBILITY map + 8/8 tests passing
 
 ### Phase 8: Integration Test
 **Status:** Planned
