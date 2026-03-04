@@ -2,6 +2,7 @@
 
 ## Current Phase: 10 (E2E Validation)
 ## Current Plan: 2 of 3
+## Last Completed: 10-01-PLAN.md (E2E Dispatch Tests)
 ## Status: IN PROGRESS
 ## Mode: EXECUTION
 
@@ -24,8 +25,9 @@ Phase progress tracked in `.planning/phases/` directories and `ROADMAP.md`.
 - **New files created:** 22 (19 from phases 1-6 + 2 from phase 7 + 1 from phase 8)
 - **Total lines added:** ~5,000
 - **TypeScript errors:** 0 (last checked: 2026-03-04)
-- **Existing tests:** 444+ unit tests + 23 integration tests
+- **Existing tests:** 444+ unit tests + 23 integration tests + 10 E2E tests
 - **Integration tests:** 23/23 passing (conductor-scheduler-executor.test.ts)
+- **E2E tests:** 10/10 passing (electron-dispatch.test.ts)
 - **Score:** 95/100 (per code review)
 
 ## Files Created (All Phases)
@@ -75,7 +77,7 @@ Phase progress tracked in `.planning/phases/` directories and `ROADMAP.md`.
 | GAP-002 | Claude adapter tests not written | Phase 7 | RESOLVED (b0ed68a) |
 | GAP-003 | Conductor→Scheduler→Executor not integration tested | Phase 8 | RESOLVED (de2d362) |
 | GAP-004 | Circuit breaker user escalation not wired | Phase 9 | RESOLVED (26d0afa, c6b0c0a, b260c4c) |
-| GAP-005 | No E2E tests for enforcement pipeline | Phase 10 | Pending |
+| GAP-005 | No E2E tests for enforcement pipeline | Phase 10 | RESOLVED (06b0c44, c2c7bdc) |
 | GAP-006 | Send interceptor not integration tested | Phase 8 | RESOLVED (de2d362) |
 
 ## Key Decisions
@@ -90,6 +92,8 @@ Phase progress tracked in `.planning/phases/` directories and `ROADMAP.md`.
 - Removed broken conductor:user-decision handler; renderer uses sendStepDecision() via preload bridge
 - CircuitBreakerModal uses inline styles (not Tailwind) per CLAUDE.md minimal frontend directive
 - Phase 9 Plan 02 checkpoint auto-approved; manual verification deferred to Phase 10 E2E
+- E2E tests use require.cache mock pattern (not real Playwright Electron launch) for CI-friendly automated execution
+- Playwright core package installed (not @playwright/test) to preserve custom test framework consistency
 - Session resume tested via capabilities() report; AgentConfig lacks sessionId field
 - Production readiness script uses structural/static checks only (no slow test suite runs)
 
@@ -104,4 +108,5 @@ Phase progress tracked in `.planning/phases/` directories and `ROADMAP.md`.
 | 2026-03-04 | Phase 8 Plan 01: Integration test (23/23 passing) | de2d362 |
 | 2026-03-04 | Phase 9 Plan 01: Circuit breaker IPC wiring + confidence-aware filtering | 26d0afa, c6b0c0a |
 | 2026-03-04 | Phase 9 Plan 02: CircuitBreakerModal component + IPC types + App wiring | b260c4c |
+| 2026-03-04 | Phase 10 Plan 01: E2E dispatch tests (10/10 passing) + infrastructure + npm scripts + --test-mode | 06b0c44, c2c7bdc |
 | 2026-03-04 | Phase 10 Plan 02: Compatibility matrix (4/4) + production readiness script (13 checks) | 335f51c, d692fe0 |
