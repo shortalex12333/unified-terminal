@@ -3,6 +3,9 @@
 // Never sequential. Uses Promise.allSettled to run multiple checks concurrently.
 // Aggregates results into a single verdict: PASS, HARD_FAIL, or SOFT_FAIL.
 
+import { CHECK_ACTIVATION } from '../constants/10-check-activation';
+import { BODYGUARD } from '../constants/25-bodyguard';
+import { ENFORCER_RETRY_POLICIES } from '../constants/09-retry-policies';
 import type {
   BodyguardVerdict,
   GateResult,
@@ -13,89 +16,7 @@ import type {
 } from "./types";
 import { runCheckWithRetry } from "./enforcer";
 
-/**
- * MOCK: Placeholder for constants from constants/09-retry-policies.ts
- * When Sub-agent A finishes, this import will be uncommented:
- * import { ENFORCER_RETRY_POLICIES } from '../constants/09-retry-policies';
- * For now, we define the structure to show it exists.
- */
-interface EnforcerRetryPolicies {
-  [key: string]: {
-    attempts: number;
-    delayMs: number;
-    confidence: "definitive" | "heuristic";
-  };
-}
-
-/**
- * MOCK: Placeholder for constants from constants/10-check-activation.ts
- * When Sub-agent A finishes, this import will be uncommented:
- * import { CHECK_ACTIVATION } from '../constants/10-check-activation';
- */
-interface CheckActivationMap {
-  every_execute: string[];
-  code_modified: string[];
-  tier_2_plus: string[];
-  post_build: string[];
-  pre_deploy: string[];
-  frontend_build: string[];
-  post_uninstall: string[];
-  post_error_fix: string[];
-  cron_30s: string[];
-}
-
-/**
- * MOCK: Placeholder for constants from constants/25-bodyguard.ts
- * When Sub-agent A finishes, this import will be uncommented:
- * import { BODYGUARD } from '../constants/25-bodyguard';
- */
-interface BodyguardConstants {
-  MAX_PARALLEL_CHECKS: number;
-  TOTAL_GATE_TIMEOUT_MS: number;
-  PARTIAL_TIMEOUT_POLICY: "fail_timed_out_only" | "fail_all" | "warn_and_continue";
-  MIXED_RESULT_POLICY: "hard_fails_block_soft_fails_warn";
-  MIN_CHECKS_REQUIRED: number;
-}
-
-// Placeholder implementations (will be replaced by actual constants)
-const ENFORCER_RETRY_POLICIES: EnforcerRetryPolicies = {
-  "test-exit-code": { attempts: 1, delayMs: 0, confidence: "definitive" },
-  "file-existence": { attempts: 1, delayMs: 0, confidence: "definitive" },
-  "file-non-empty": { attempts: 1, delayMs: 0, confidence: "heuristic" },
-  "build-artifact": { attempts: 1, delayMs: 0, confidence: "definitive" },
-  "scope-enforcement": { attempts: 1, delayMs: 0, confidence: "definitive" },
-  "token-threshold": { attempts: 1, delayMs: 0, confidence: "definitive" },
-  "secret-detection": { attempts: 1, delayMs: 0, confidence: "definitive" },
-  "uninstall-verify": { attempts: 1, delayMs: 0, confidence: "definitive" },
-  "docker-health": { attempts: 3, delayMs: 5_000, confidence: "heuristic" },
-  "lesson-template": { attempts: 1, delayMs: 0, confidence: "definitive" },
-  "responsive-screenshots": {
-    attempts: 1,
-    delayMs: 0,
-    confidence: "definitive",
-  },
-  "deploy-health": { attempts: 3, delayMs: 10_000, confidence: "heuristic" },
-};
-
-const CHECK_ACTIVATION: CheckActivationMap = {
-  every_execute: ["file-existence"],
-  code_modified: ["test-exit-code", "scope-enforcement"],
-  tier_2_plus: ["file-non-empty", "scope-enforcement"],
-  post_build: ["build-artifact"],
-  pre_deploy: ["secret-detection", "docker-health"],
-  frontend_build: ["responsive-screenshots"],
-  post_uninstall: ["uninstall-verify"],
-  post_error_fix: ["lesson-template"],
-  cron_30s: ["token-threshold"],
-};
-
-const BODYGUARD: BodyguardConstants = {
-  MAX_PARALLEL_CHECKS: 5,
-  TOTAL_GATE_TIMEOUT_MS: 120_000,
-  PARTIAL_TIMEOUT_POLICY: "fail_timed_out_only",
-  MIXED_RESULT_POLICY: "hard_fails_block_soft_fails_warn",
-  MIN_CHECKS_REQUIRED: 1,
-};
+// Source: HARDCODED-ENFORCEMENT-VALUES.md sections 9-11, ENFORCEMENT-GAPS.md gap 1
 
 /**
  * determineApplicableChecks: Figure out which checks should run based on step context.
