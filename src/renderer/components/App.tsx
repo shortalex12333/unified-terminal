@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import ProfilePicker, { Provider } from './ProfilePicker';
 import ChatInterface from './ChatInterface';
+import CircuitBreakerModal from './CircuitBreakerModal';
 
 export default function App() {
   const [selectedProvider, setSelectedProvider] = useState<Provider | null>(null);
@@ -18,14 +19,17 @@ export default function App() {
     };
   }, []);
 
-  if (!selectedProvider) {
-    return <ProfilePicker onSelectProvider={setSelectedProvider} />;
-  }
-
   return (
-    <ChatInterface
-      provider={selectedProvider}
-      onLogout={() => setSelectedProvider(null)}
-    />
+    <>
+      {!selectedProvider ? (
+        <ProfilePicker onSelectProvider={setSelectedProvider} />
+      ) : (
+        <ChatInterface
+          provider={selectedProvider}
+          onLogout={() => setSelectedProvider(null)}
+        />
+      )}
+      <CircuitBreakerModal />
+    </>
   );
 }

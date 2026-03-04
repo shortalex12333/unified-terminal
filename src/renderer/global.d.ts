@@ -118,6 +118,16 @@ interface ElectronAPI {
     // When provider's web UI navigates to login page, this fires
     onLogoutDetected: (cb: (provider: string) => void) => () => void;
   };
+
+  // Circuit breaker (step-scheduler user escalation)
+  onStepNeedsUser: (callback: (options: {
+    step: { id: number; action: string; detail: string; error?: string; retryCount: number };
+    actions: ('retry' | 'skip' | 'stop')[];
+    suggested: 'retry' | 'skip' | 'stop';
+    errorContext: string;
+  }) => void) => () => void;
+
+  sendStepDecision: (stepId: number, decision: 'retry' | 'skip' | 'stop') => Promise<boolean>;
 }
 
 declare global {
