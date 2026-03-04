@@ -43,38 +43,35 @@
 **Summary:** Full pipeline integration test (23 tests), GAP-003/006 resolved
 
 ### Phase 9: Circuit Breaker Escalation
-**Status:** Planned
+**Status:** Complete
 **Goal:** Wire retry -> warn user -> stop DAG flow from HARDCODED-ENFORCEMENT-VALUES.md.
 **Plans:** 2 plans
 
 Plans:
-- [ ] 09-01-PLAN.md — Backend: CIRCUIT_BREAKER constants, confidence-aware circuit breaker, IPC wiring fixes
-- [ ] 09-02-PLAN.md — Frontend: CircuitBreakerModal component, global.d.ts types, App.tsx wiring
+- [x] 09-01-PLAN.md — Backend: CIRCUIT_BREAKER constants, confidence-aware circuit breaker, IPC wiring fixes
+- [x] 09-02-PLAN.md — Frontend: CircuitBreakerModal component, global.d.ts types, App.tsx wiring
 
-**Key Deliverables:**
-- Update step-scheduler circuit breaker with user escalation
-- IPC handler for user decision (continue/abort)
-- Renderer UI for circuit breaker notification
-
-**Acceptance Criteria:**
-1. After N consecutive failures, scheduler pauses and asks user
-2. User can choose: retry, skip step, abort DAG
-3. Decision propagates correctly through scheduler
+**Summary:** Confidence-aware circuit breaker + CircuitBreakerModal + IPC pipeline wired end-to-end
 
 ### Phase 10: E2E Testing & Production Readiness
 **Status:** Planned
-**Goal:** Final validation before production deployment.
+**Goal:** Final validation before production deployment. Close GAP-005, prove enforcement pipeline works end-to-end, verify production readiness.
+**Plans:** 3 plans
 
-**Source of Truth:** `docs/ONGOING_WORK/ADAPTORS/LEVEL-3-E2E-TESTING.md`
+Plans:
+- [ ] 10-01-PLAN.md — E2E test infrastructure + 10 dispatch tests (DOM injection, rate limit, adapter dispatch, error recovery)
+- [ ] 10-02-PLAN.md — Compatibility matrix validation (4 checks) + production readiness script (13 checks)
+- [ ] 10-03-PLAN.md — Production readiness checklist document (16 criteria) + GAP-005 closure + human verification
 
 **Key Deliverables:**
-- 10 Playwright + Electron E2E tests
-- Production readiness verification script
-- Compatibility matrix validation
+- 10 E2E tests covering full dispatch pipeline
+- Production readiness verification script (13 checks)
+- Compatibility matrix validation (4/4 checks, Gemini shelved)
 - 16-point checklist document
 
 **Acceptance Criteria:**
 1. All 10 E2E tests pass
 2. Production readiness script exits 0
-3. Compatibility checks pass 5/5
-4. 335+ total tests passing
+3. Compatibility checks pass 4/4
+4. 460+ total tests passing
+5. GAP-005 RESOLVED
