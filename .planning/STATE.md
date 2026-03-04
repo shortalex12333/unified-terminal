@@ -1,10 +1,10 @@
 # Unified Terminal — Project State
 
-## Current Phase: 10 (E2E Validation)
-## Current Plan: 2 of 3
-## Last Completed: 10-01-PLAN.md (E2E Dispatch Tests)
-## Status: IN PROGRESS
-## Mode: EXECUTION
+## Current Phase: 10 (E2E Validation) -- COMPLETE
+## Current Plan: 3 of 3 (DONE)
+## Last Completed: 10-03-PLAN.md (Production Readiness Checklist + GAP-005 Closure)
+## Status: MILESTONE v1.0 COMPLETE
+## Mode: DONE
 
 Phase progress tracked in `.planning/phases/` directories and `ROADMAP.md`.
 
@@ -20,15 +20,20 @@ Phase progress tracked in `.planning/phases/` directories and `ROADMAP.md`.
 - `tests/claude-adapter.test.ts` — 8 unit tests, all passing (commit b0ed68a)
 - `tsc --noEmit` — zero errors
 
-## Codebase Stats (Post Phase 8)
+## Codebase Stats (Post Phase 10 -- FINAL)
 
-- **New files created:** 22 (19 from phases 1-6 + 2 from phase 7 + 1 from phase 8)
-- **Total lines added:** ~5,000
+- **New files created:** 28 (19 from phases 1-6 + 2 from phase 7 + 1 from phase 8 + 3 from phase 10 E2E + 2 from phase 10 compat/script + 1 from phase 10 checklist)
+- **Total lines added:** ~6,000
 - **TypeScript errors:** 0 (last checked: 2026-03-04)
-- **Existing tests:** 444+ unit tests + 23 integration tests + 10 E2E tests
+- **Unit tests:** 444+ passing across 13 test files
 - **Integration tests:** 23/23 passing (conductor-scheduler-executor.test.ts)
 - **E2E tests:** 10/10 passing (electron-dispatch.test.ts)
+- **Compatibility tests:** 4/4 passing (compatibility-matrix-validation.ts)
+- **Production readiness:** 13/13 checks passing (verify-production-readiness.sh)
+- **Total tests:** 480+ passing (all categories)
+- **Production readiness criteria:** 16/16 PASS
 - **Score:** 95/100 (per code review)
+- **Known gaps:** 0 open (6/6 resolved)
 
 ## Files Created (All Phases)
 
@@ -61,8 +66,22 @@ Phase progress tracked in `.planning/phases/` directories and `ROADMAP.md`.
 - `normalizer.ts` — Raw output → GateCheckInput
 - `index.ts` — Barrel exports
 
-### tests/integration/ (1 file — Phase 8)
+### tests/integration/ (1 file -- Phase 8)
 - `conductor-scheduler-executor.test.ts` — Full pipeline integration test (1005 lines, 23 tests)
+
+### tests/e2e/ (3 files -- Phase 10)
+- `electron-dispatch.test.ts` — 10 E2E dispatch tests (DOM injection, rate limit, adapter dispatch, error recovery)
+- `fixtures.ts` — Playwright Electron launch helpers + custom test framework
+- `mocks.ts` — Mock ChatGPT DOM, CLI responses, rate limit content
+
+### tests/ (1 file -- Phase 10)
+- `compatibility-matrix-validation.ts` — 4 compatibility checks (Codex JSON, Claude agent file, session resume, ChatGPT DOM)
+
+### scripts/ (1 file -- Phase 10)
+- `verify-production-readiness.sh` — 13-check production readiness gate script
+
+### docs/ONGOING_WORK/ADAPTORS/ (1 file -- Phase 10)
+- `PRODUCTION-READINESS.md` — 16-point production readiness checklist with sign-off table
 
 ## Modified Files
 
@@ -96,6 +115,8 @@ Phase progress tracked in `.planning/phases/` directories and `ROADMAP.md`.
 - Playwright core package installed (not @playwright/test) to preserve custom test framework consistency
 - Session resume tested via capabilities() report; AgentConfig lacks sessionId field
 - Production readiness script uses structural/static checks only (no slow test suite runs)
+- Milestone v1.0 production readiness checklist: 16/16 criteria PASS, all 6 known gaps RESOLVED
+- Phase 10 Plan 03 checkpoint auto-approved per user directive (one-shot all phases)
 
 ## Quick Tasks Completed
 
@@ -110,3 +131,4 @@ Phase progress tracked in `.planning/phases/` directories and `ROADMAP.md`.
 | 2026-03-04 | Phase 9 Plan 02: CircuitBreakerModal component + IPC types + App wiring | b260c4c |
 | 2026-03-04 | Phase 10 Plan 01: E2E dispatch tests (10/10 passing) + infrastructure + npm scripts + --test-mode | 06b0c44, c2c7bdc |
 | 2026-03-04 | Phase 10 Plan 02: Compatibility matrix (4/4) + production readiness script (13 checks) | 335f51c, d692fe0 |
+| 2026-03-04 | Phase 10 Plan 03: Production readiness checklist (16/16 PASS) + GAP-005 closed + milestone v1.0 complete | -- |
