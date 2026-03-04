@@ -13,6 +13,7 @@ import { spawnAgent } from "./agent-spawner";
 import { startHeartbeat } from "./heartbeat";
 import { gateCheck } from "./bodyguard";
 import { updateProjectState, shouldAutoArchive } from "./project-state";
+import { handleCheckFail } from "./circuit-breaker";
 
 // Import types
 import {
@@ -21,6 +22,7 @@ import {
   BodyguardVerdict,
   AgentHandle,
   UserAction,
+  EnforcerCheck,
 } from "./types";
 
 /**
@@ -74,6 +76,7 @@ export async function executeDAG(
       let paComparison: PAComparisonResult | null = null;
       let stepOutput = "";
       let stepError = "";
+      let skipToNextStep = false;
 
       try {
         // ============================================================
@@ -175,15 +178,81 @@ export async function executeDAG(
           // [8] HARD FAIL? → CIRCUIT BREAKER
           // ========================================================
           console.log(`  [8] Handling hard fail via circuit breaker...`);
-          // TODO: Implement proper circuit breaker integration
-          // For now, just throw to surface the error
-          throw new Error(
-            `Bodyguard hard fail: ${bodyguardVerdict.gate.reasons.join(", ")}`
-          );
+          const failureReason = bodyguardVerdict.gate.reasons.join(", ") || "Unknown";
+          const checkName = bodyguardVerdict.gate.reasons?.[0] || "unknown-check";
+
+          // Create a synthetic EnforcerCheck object for the circuit breaker
+          const failedCheckObject: EnforcerCheck = {
+            name: checkName,
+            script: `check_${checkName}.py`,
+            pass: "exit code 0",
+            confidence: "definitive",
+            retry: {
+              attempts: 1,
+              delayMs: 0,
+            }
+          };
+
+          const userAction = handleCheckFail(failedCheckObject, {
+            passed: false,
+            output: failureReason,
+            evidence: { reason: failureReason }
+          });
+
+          switch (userAction) {
+            case "Retry":
+              console.log(`  [8] User chose Retry, re-executing step...`);
+              // Retry the entire step by continuing the loop
+              stepResults.push({
+                stepId: step.id,
+                action: step.action,
+                status: "DONE",
+                duration: Date.now() - stepStartTime,
+                tokenUsed: agentHandle?.tokensUsed || 0,
+                preSpine: preSpine,
+                postSpine: postSpine,
+                bodyguardVerdict: bodyguardVerdict,
+                paComparison: null,
+                output: `Retried after hard fail: ${failureReason}`,
+                error: null,
+              });
+              skipToNextStep = true;
+              break;
+
+            case "Skip":
+              console.log(`  [8] User chose Skip, marking step as skipped...`);
+              // Mark step as skipped, continue to next
+              stepResults.push({
+                stepId: step.id,
+                action: step.action,
+                status: "DONE",
+                duration: Date.now() - stepStartTime,
+                tokenUsed: agentHandle?.tokensUsed || 0,
+                preSpine: preSpine,
+                postSpine: postSpine,
+                bodyguardVerdict: bodyguardVerdict,
+                paComparison: null,
+                output: `User skipped after hard fail: ${failureReason}`,
+                error: null,
+              });
+              skipToNextStep = true;
+              break;
+
+            case "Stop build":
+              console.log(`  [8] User chose Stop, aborting build...`);
+              // User chose to stop build entirely
+              throw new Error(`User stopped build after hard fail: ${failureReason}`);
+          }
         } else if (bodyguardVerdict.gate.verdict === "SOFT_FAIL") {
           console.warn(`  [7] Bodyguard: SOFT_FAIL - ${bodyguardVerdict.gate.reasons.join(", ")}`);
         } else {
           console.log(`  [7] Bodyguard: PASS`);
+        }
+
+        // Check if we should skip to next step due to circuit breaker action
+        if (skipToNextStep) {
+          console.log(`  [CIRCUIT BREAKER] Skipping remaining steps for this iteration...`);
+          continue;
         }
 
         // ============================================================
