@@ -1,10 +1,14 @@
 /* Kenoki Design System Tokens */
 
 :root {
-  /* Brand gradient (logo/hero only - NOT for small UI) */
-  --kenoki-gradient: linear-gradient(135deg, #C7A6D8, #D9A6C7, #EAA7B6, #F1A8A6);
+  /* Brand gradient (logo only) */
+  --kenoki-gradient: linear-gradient(135deg, #e6c3df, #fcc5cb);
 
-  /* Accent blue (interactions only) */
+  /* Primary button blue */
+  --kenoki-primary: #1b70db;
+  --kenoki-primary-hover: #1560c0;
+
+  /* Accent blue (interactions) */
   --kenoki-accent: #ACCBEE;
   --kenoki-accent-hover: #9FC2EA;
   --kenoki-accent-soft: rgba(172, 203, 238, 0.08);
@@ -32,7 +36,7 @@
 
 /* Light theme (launch screens) */
 [data-theme="light"], .theme-light {
-  --kenoki-bg: #E8EDF5;
+  --kenoki-bg: #e7f0fd;
   --kenoki-bg-secondary: #F0F0F8;
   --kenoki-surface: #FFFFFF;
   --kenoki-border: #E4E4E7;

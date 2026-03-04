@@ -3,7 +3,12 @@
  *
  * First screen user sees on app launch.
  * Shows Kenoki branding and "Begin" button.
- * Matches prototype: docs/BRAND/MEDIA/PROTOTYPES/starting_screen.png
+ *
+ * Design Specs:
+ * - Logo: Bumbbled Regular, gradient #e6c3df → #fcc5cb @135°
+ * - Subheader: Eloquia Display Light, #1d1d1f
+ * - Background: #e7f0fd
+ * - Button: Poppins Regular, bg #1b70db, text #ffffff, pill radius
  */
 
 import React from 'react';
@@ -24,32 +29,33 @@ export default function StartingScreen({ onBegin }: StartingScreenProps): React.
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        fontFamily: 'var(--kenoki-font)',
       }}
     >
-      {/* Kenoki Logo - Script font with gradient */}
+      {/* Kenoki Logo - Bumbbled font with gradient */}
       <h1
         style={{
           fontSize: 96,
           fontWeight: 400,
-          fontStyle: 'italic',
-          fontFamily: "'Brush Script MT', 'Segoe Script', cursive",
+          fontFamily: "'Bumbbled', cursive",
           background: 'var(--kenoki-gradient)',
           WebkitBackgroundClip: 'text',
           WebkitTextFillColor: 'transparent',
           backgroundClip: 'text',
           margin: 0,
-          marginBottom: 8,
+          marginBottom: 16,
+          paddingRight: 20,
         }}
       >
         Kenoki
       </h1>
 
-      {/* Tagline */}
+      {/* Tagline - Eloquia Display Light */}
       <p
         style={{
           fontSize: 20,
-          color: 'var(--kenoki-text)',
+          fontFamily: "'Eloquia Display', sans-serif",
+          fontWeight: 300,
+          color: '#1d1d1f',
           margin: 0,
           marginBottom: 40,
         }}
@@ -57,25 +63,26 @@ export default function StartingScreen({ onBegin }: StartingScreenProps): React.
         Do more, with Kenoki.
       </p>
 
-      {/* Begin Button */}
+      {/* Begin Button - Poppins Regular */}
       <button
         onClick={onBegin}
         style={{
           padding: '14px 48px',
           fontSize: 16,
-          fontWeight: 500,
-          color: 'var(--kenoki-text)',
-          background: 'var(--kenoki-accent)',
+          fontWeight: 400,
+          fontFamily: "'Poppins', sans-serif",
+          color: '#ffffff',
+          background: 'var(--kenoki-primary)',
           border: 'none',
           borderRadius: 'var(--kenoki-radius-pill)',
           cursor: 'pointer',
           transition: 'background 0.15s, transform 0.1s',
         }}
         onMouseEnter={(e) => {
-          e.currentTarget.style.background = 'var(--kenoki-accent-hover)';
+          e.currentTarget.style.background = 'var(--kenoki-primary-hover)';
         }}
         onMouseLeave={(e) => {
-          e.currentTarget.style.background = 'var(--kenoki-accent)';
+          e.currentTarget.style.background = 'var(--kenoki-primary)';
         }}
         onMouseDown={(e) => {
           e.currentTarget.style.transform = 'scale(0.98)';

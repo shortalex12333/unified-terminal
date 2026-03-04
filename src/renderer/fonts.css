@@ -1,0 +1,25 @@
+/* Kenoki Brand Fonts */
+
+@font-face {
+  font-family: 'Bumbbled';
+  src: url('./fonts/Bumbbled.otf') format('opentype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Eloquia Display';
+  src: url('./fonts/Eloquia-Display-Light.otf') format('opentype');
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Poppins';
+  src: url('./fonts/Poppins-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
