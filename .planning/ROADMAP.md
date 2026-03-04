@@ -38,29 +38,18 @@
 **Summary:** Claude adapter (433 lines) + frontmatter (105 lines) + factory registration + 29-skill COMPATIBILITY map + 8/8 tests passing
 
 ### Phase 8: Integration Test
-**Status:** Planned
+**Status:** Complete
 **Goal:** Prove Conductor classifies -> Scheduler creates DAG -> Executor spawns CLI -> Enforcement runs at each step.
-**Plans:** 1 plan
-
-Plans:
-- [ ] 08-01-PLAN.md — Full pipeline integration test (Conductor -> Scheduler -> Executor -> Enforcement)
-
-**Key Deliverables:**
-- `tests/integration/conductor-scheduler-executor.test.ts`
-- Mock Codex responses for classification
-- Verify 10-step enforcement flow fires in order
-- Verify pre/post spine comparison detects changes
-
-**Acceptance Criteria:**
-1. Mock message classified correctly by Conductor
-2. DAG steps execute in dependency order
-3. Pre-gate bodyguard runs before execution
-4. Post-gate bodyguard runs after execution
-5. Circuit breaker triggers on repeated failures
+**Summary:** Full pipeline integration test (23 tests), GAP-003/006 resolved
 
 ### Phase 9: Circuit Breaker Escalation
 **Status:** Planned
 **Goal:** Wire retry -> warn user -> stop DAG flow from HARDCODED-ENFORCEMENT-VALUES.md.
+**Plans:** 2 plans
+
+Plans:
+- [ ] 09-01-PLAN.md — Backend: CIRCUIT_BREAKER constants, confidence-aware circuit breaker, IPC wiring fixes
+- [ ] 09-02-PLAN.md — Frontend: CircuitBreakerModal component, global.d.ts types, App.tsx wiring
 
 **Key Deliverables:**
 - Update step-scheduler circuit breaker with user escalation
