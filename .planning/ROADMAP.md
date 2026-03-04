@@ -39,7 +39,11 @@
 
 ### Phase 8: Integration Test
 **Status:** Planned
-**Goal:** Prove Conductor classifies → Scheduler creates DAG → Executor spawns CLI → Enforcement runs at each step.
+**Goal:** Prove Conductor classifies -> Scheduler creates DAG -> Executor spawns CLI -> Enforcement runs at each step.
+**Plans:** 1 plan
+
+Plans:
+- [ ] 08-01-PLAN.md — Full pipeline integration test (Conductor -> Scheduler -> Executor -> Enforcement)
 
 **Key Deliverables:**
 - `tests/integration/conductor-scheduler-executor.test.ts`
@@ -56,7 +60,7 @@
 
 ### Phase 9: Circuit Breaker Escalation
 **Status:** Planned
-**Goal:** Wire retry → warn user → stop DAG flow from HARDCODED-ENFORCEMENT-VALUES.md.
+**Goal:** Wire retry -> warn user -> stop DAG flow from HARDCODED-ENFORCEMENT-VALUES.md.
 
 **Key Deliverables:**
 - Update step-scheduler circuit breaker with user escalation
