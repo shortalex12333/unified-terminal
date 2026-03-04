@@ -472,6 +472,39 @@ export class CLIRunner extends EventEmitter {
     }
   }
 
+  /**
+   * Write data to a process's stdin.
+   * Used for interactive input (e.g., responding to authentication prompts).
+   *
+   * @param processId - The process ID
+   * @param data - Data to write to stdin
+   * @returns True if write succeeded, false if process not found or stdin not available
+   */
+  writeToStdin(processId: string, data: string): boolean {
+    const entry = this.processes.get(processId);
+    if (!entry) {
+      console.log(`[CLIRunner] Process ${processId} not found for stdin write`);
+      return false;
+    }
+
+    const { process: childProcess } = entry;
+    if (!childProcess.stdin) {
+      console.log(`[CLIRunner] Process ${processId} stdin not available`);
+      return false;
+    }
+
+    try {
+      // Add newline if not present
+      const input = data.endsWith('\n') ? data : `${data}\n`;
+      childProcess.stdin.write(input);
+      console.log(`[CLIRunner] Wrote to stdin of process ${processId}: ${data.trim()}`);
+      return true;
+    } catch (error) {
+      console.error(`[CLIRunner] Failed to write to stdin of process ${processId}:`, error);
+      return false;
+    }
+  }
+
   // ==========================================================================
   // PROCESS QUERIES
   // ==========================================================================

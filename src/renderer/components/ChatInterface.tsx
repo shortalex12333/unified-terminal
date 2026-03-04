@@ -41,6 +41,8 @@ const PROVIDER_CONFIG: Record<Provider, ProviderConfig> = {
 export default function ChatInterface({ provider, onLogout }: Props) {
   const config = PROVIDER_CONFIG[provider];
 
+  console.log('[ChatInterface] Rendering nav bar for provider:', provider);
+
   const handleSwitchAI = async () => {
     // Hide BrowserView before switching
     await window.electronAPI?.providerView?.hide?.();
@@ -49,7 +51,7 @@ export default function ChatInterface({ provider, onLogout }: Props) {
 
   // Bottom navigation bar - BrowserView fills space above this
   return (
-    <div className="fixed bottom-0 left-0 right-0 h-14 bg-[#1a1a1a] border-t border-white/10 flex items-center justify-between px-4 z-50">
+    <div className="fixed bottom-0 left-0 right-0 h-14 bg-[#2a2a2a] border-t-2 border-blue-500 flex items-center justify-between px-4 z-[9999]">
       {/* Left: Current provider indicator */}
       <div className="flex items-center gap-3">
         <div

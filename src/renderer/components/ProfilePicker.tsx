@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { ProviderState } from './App';
 
-export type Provider = 'chatgpt' | 'gemini' | 'claude';
+export type Provider = 'chatgpt' | 'claude';
+// Gemini removed - Google OAuth incompatible with Electron
 
 interface ProviderProfile {
   id: Provider;
@@ -20,19 +21,13 @@ const PROVIDERS: ProviderProfile[] = [
     logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/0/04/ChatGPT_logo.svg',
   },
   {
-    id: 'gemini',
-    name: 'Gemini',
-    description: 'Google',
-    color: '#4285f4',
-    logoUrl: 'https://www.gstatic.com/lamda/images/gemini_sparkle_v002_d4735304ff6292a690345.svg',
-  },
-  {
     id: 'claude',
     name: 'Claude',
     description: 'Anthropic',
     color: '#cc785c',
     logoUrl: 'https://anthropic.com/images/icons/apple-touch-icon.png',
   },
+  // Gemini shelved - Google OAuth blocks embedded browsers and CLI auth is too fragile
 ];
 
 interface Props {
@@ -40,10 +35,7 @@ interface Props {
 }
 
 function getProviderMode(provider: Provider): 'cli' | 'browserview' {
-  // Gemini can use CLI, others use BrowserView
-  if (provider === 'gemini') {
-    return 'cli';
-  }
+  // All providers use BrowserView (Gemini shelved due to Google OAuth restrictions)
   return 'browserview';
 }
 
@@ -64,7 +56,7 @@ export default function ProfilePicker({ onSelectProvider }: Props) {
       const providerMode = getProviderMode(provider);
 
       if (providerMode === 'cli') {
-        // Spawn Gemini CLI
+        // Try to spawn Gemini CLI
         const result = await window.electronAPI?.cli?.spawnGemini?.();
         if (result?.success && result.processId) {
           onSelectProvider({
@@ -73,8 +65,18 @@ export default function ProfilePicker({ onSelectProvider }: Props) {
             processId: result.processId,
           });
         } else {
-          console.error('[ProfilePicker] Failed to spawn Gemini CLI:', result?.error);
-          setSelectedProvider(null);
+          console.warn('[ProfilePicker] Gemini CLI failed, falling back to BrowserView');
+          // Fallback to BrowserView if CLI spawn fails
+          const fallbackResult = await window.electronAPI?.providerView?.show?.(provider);
+          if (fallbackResult?.success) {
+            onSelectProvider({
+              provider,
+              providerType: 'browserview',
+            });
+          } else {
+            console.error('[ProfilePicker] Fallback to BrowserView also failed:', fallbackResult?.error);
+            setSelectedProvider(null);
+          }
         }
       } else {
         // Use BrowserView for ChatGPT, Claude

@@ -18,6 +18,12 @@ export default function TerminalUI({ provider, processId, onSwitchAI }: Props) {
     const cleanup = window.electronAPI?.cli?.onOutputChunk?.((data: { processId: string; chunk: string }) => {
       if (data.processId === processId) {
         setOutput(prev => prev + data.chunk);
+
+        // Detect authentication errors
+        if (data.chunk.includes('FatalAuthenticationError') || data.chunk.includes('Interactive consent could not be obtained')) {
+          setError('Gemini CLI needs authentication. Please run: gemini auth');
+        }
+
         // Auto-scroll to bottom
         setTimeout(() => {
           if (outputRef.current) {
@@ -55,8 +61,13 @@ export default function TerminalUI({ provider, processId, onSwitchAI }: Props) {
     setError(null);
 
     try {
-      await window.electronAPI?.cli?.send?.(provider, input);
-      setInput('');
+      const result = await window.electronAPI?.cli?.send?.(provider, processId, input);
+      if (result?.success) {
+        setInput('');
+      } else {
+        setError(`Failed to send input: ${result?.error || 'Unknown error'}`);
+        setIsLoading(false);
+      }
     } catch (err) {
       setError(`Failed to send input: ${String(err)}`);
       setIsLoading(false);
