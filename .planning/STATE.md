@@ -1,7 +1,8 @@
 # Unified Terminal — Project State
 
-## Current Phase: 8 (Integration Test)
-## Status: COMPLETE
+## Current Phase: 9 (Circuit Breaker Escalation)
+## Current Plan: 2 of 2
+## Status: IN PROGRESS
 ## Mode: EXECUTION
 
 Phase progress tracked in `.planning/phases/` directories and `ROADMAP.md`.
@@ -63,8 +64,8 @@ Phase progress tracked in `.planning/phases/` directories and `ROADMAP.md`.
 
 ## Modified Files
 
-- `src/main/step-scheduler.ts` — 10-step enforcement flow + buildDagProgress()
-- `src/main/index.ts` — 3 executors registered
+- `src/main/step-scheduler.ts` — 10-step enforcement flow + buildDagProgress() + confidence-aware circuit breaker
+- `src/main/index.ts` — 3 executors registered + step-needs-user forwarding + scheduler.setMainWindow()
 
 ## Known Gaps
 
@@ -73,7 +74,7 @@ Phase progress tracked in `.planning/phases/` directories and `ROADMAP.md`.
 | GAP-001 | COMPATIBILITY map: 17/28 skills | Phase 7 | RESOLVED (29 entries) |
 | GAP-002 | Claude adapter tests not written | Phase 7 | RESOLVED (b0ed68a) |
 | GAP-003 | Conductor→Scheduler→Executor not integration tested | Phase 8 | RESOLVED (de2d362) |
-| GAP-004 | Circuit breaker user escalation not wired | Phase 9 | Pending |
+| GAP-004 | Circuit breaker user escalation not wired | Phase 9 | RESOLVED (26d0afa, c6b0c0a) |
 | GAP-005 | No E2E tests for enforcement pipeline | Phase 10 | Pending |
 | GAP-006 | Send interceptor not integration tested | Phase 8 | RESOLVED (de2d362) |
 
@@ -85,6 +86,8 @@ Phase progress tracked in `.planning/phases/` directories and `ROADMAP.md`.
 - 28 skills from DISSECTION (not 17) must be in COMPATIBILITY map
 - GSD phase directories created for proper workflow tracking
 - Enforcer mock needed in integration tests: file-existence check has definitive confidence, missing Python scripts cause HARD_FAIL that blocks execution
+- Definitive failures timeout to 'stop' (not 'skip') to prevent auto-skipping critical enforcement checks
+- Removed broken conductor:user-decision handler; renderer uses sendStepDecision() via preload bridge
 
 ## Quick Tasks Completed
 
@@ -95,3 +98,4 @@ Phase progress tracked in `.planning/phases/` directories and `ROADMAP.md`.
 | 2026-03-04 | GSD restructure: create .planning/phases/ with PLAN+SUMMARY for phases 1-6 | — |
 | 2026-03-04 | Phase 7 Plan 01: Claude adapter tests (8/8 passing) | b0ed68a |
 | 2026-03-04 | Phase 8 Plan 01: Integration test (23/23 passing) | de2d362 |
+| 2026-03-04 | Phase 9 Plan 01: Circuit breaker IPC wiring + confidence-aware filtering | 26d0afa, c6b0c0a |
