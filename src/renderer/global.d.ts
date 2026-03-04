@@ -87,7 +87,7 @@ interface ElectronAPI {
     // Cancel an active auth process
     cancelAuth: (provider: string) => Promise<boolean>;
     // Send a message to a CLI provider
-    send: (provider: string, message: string) => Promise<void>;
+    send: (provider: string, processId: string, message: string) => Promise<{ success: boolean; error?: string }>;
     // Listen for CLI output
     onOutput: (cb: (data: CLIOutputData) => void) => () => void;
     // Listen for auth output (OAuth prompts)
@@ -135,6 +135,11 @@ interface ElectronAPI {
     // Listen for logout detected from any provider
     // When provider's web UI navigates to login page, this fires
     onLogoutDetected: (cb: (provider: string) => void) => () => void;
+  };
+
+  // Shell methods (open external URLs in system browser)
+  shell?: {
+    openExternal: (url: string) => Promise<{ success: boolean; error?: string }>;
   };
 }
 

@@ -2159,8 +2159,13 @@ ipcMain.handle('cli:spawn-gemini', async (): Promise<{
 }> => {
   try {
     const runner = getCLIRunner();
+    // Spawn with NO_BROWSER=true to enable manual authentication in terminal
     const processId = runner.spawn('gemini', [], {
       cwd: os.homedir(),
+      env: {
+        ...process.env,
+        NO_BROWSER: 'true',  // Enable manual auth via stdin
+      },
     });
 
     console.log(`[IPC] Spawned Gemini CLI: ${processId}`);
@@ -2218,17 +2223,37 @@ ipcMain.handle('cli:kill-gemini', async (
 ipcMain.handle('cli:send-input', async (
   _event,
   provider: string,
+  processId: string,
   message: string
-): Promise<void> => {
+): Promise<{ success: boolean; error?: string }> => {
   if (provider === 'gemini') {
     try {
       const runner = getCLIRunner();
-      console.log(`[IPC] Sending to Gemini CLI: ${message}`);
-      // TODO: Implement stdin writing in cli-runner
-      // For now, just log the message
+      const success = runner.writeToStdin(processId, message);
+      console.log(`[IPC] Sent to Gemini CLI (${processId}): ${message.trim()}`);
+      return { success };
     } catch (error) {
       console.error('[IPC] Failed to send input:', error);
+      return { success: false, error: String(error) };
     }
+  }
+  return { success: false, error: 'Unknown provider' };
+});
+
+/**
+ * IPC: Open URL in system browser (for OAuth flows)
+ */
+ipcMain.handle('shell:open-external', async (
+  _event,
+  url: string
+): Promise<{ success: boolean; error?: string }> => {
+  try {
+    await shell.openExternal(url);
+    console.log(`[IPC] Opened in system browser: ${url.substring(0, 50)}...`);
+    return { success: true };
+  } catch (error) {
+    console.error('[IPC] Failed to open external URL:', error);
+    return { success: false, error: String(error) };
   }
 });
 

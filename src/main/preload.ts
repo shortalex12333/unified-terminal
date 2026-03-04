@@ -774,10 +774,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     /**
      * Send a message to a CLI provider (codex, claude-code, gemini)
      * @param provider - The CLI provider to use
+     * @param processId - The process ID of the running CLI
      * @param message - The message to send
      */
-    send: (provider: string, message: string): Promise<void> => {
-      return ipcRenderer.invoke('cli:send', provider, message);
+    send: (provider: string, processId: string, message: string): Promise<{ success: boolean; error?: string }> => {
+      return ipcRenderer.invoke('cli:send-input', provider, processId, message);
     },
 
     /**
@@ -937,6 +938,23 @@ contextBridge.exposeInMainWorld('electronAPI', {
       return () => {
         ipcRenderer.removeListener('provider:logout-detected', handler);
       };
+    },
+  },
+
+  // ============================================================================
+  // SHELL METHODS (System browser, external URLs)
+  // ============================================================================
+
+  /**
+   * Shell API for opening external URLs
+   */
+  shell: {
+    /**
+     * Open a URL in the system's default browser (Safari/Chrome)
+     * Used for OAuth flows that need to happen outside the Electron app
+     */
+    openExternal: (url: string): Promise<{ success: boolean; error?: string }> => {
+      return ipcRenderer.invoke('shell:open-external', url);
     },
   },
 });
