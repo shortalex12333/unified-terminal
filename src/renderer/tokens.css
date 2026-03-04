@@ -1,0 +1,66 @@
+/* Kenoki Design System Tokens */
+
+:root {
+  /* Brand gradient (logo/hero only - NOT for small UI) */
+  --kenoki-gradient: linear-gradient(135deg, #C7A6D8, #D9A6C7, #EAA7B6, #F1A8A6);
+
+  /* Accent blue (interactions only) */
+  --kenoki-accent: #ACCBEE;
+  --kenoki-accent-hover: #9FC2EA;
+  --kenoki-accent-soft: rgba(172, 203, 238, 0.08);
+  --kenoki-accent-border: rgba(172, 203, 238, 0.15);
+
+  /* Semantic states */
+  --kenoki-success: #7ED9B5;
+  --kenoki-warning: #F6C177;
+  --kenoki-error: #F08A8A;
+  --kenoki-error-soft: rgba(240, 138, 138, 0.1);
+
+  /* Radius system */
+  --kenoki-radius-sm: 8px;
+  --kenoki-radius-md: 14px;
+  --kenoki-radius-lg: 22px;
+  --kenoki-radius-pill: 999px;
+
+  /* Shadows */
+  --kenoki-shadow-light: 0px 8px 20px rgba(0, 0, 0, 0.06);
+  --kenoki-shadow-dark: 0px 10px 30px rgba(0, 0, 0, 0.35);
+
+  /* Typography */
+  --kenoki-font: 'SF Pro Display', 'SF Pro Text', -apple-system, system-ui, sans-serif;
+}
+
+/* Light theme (launch screens) */
+[data-theme="light"], .theme-light {
+  --kenoki-bg: #E8EDF5;
+  --kenoki-bg-secondary: #F0F0F8;
+  --kenoki-surface: #FFFFFF;
+  --kenoki-border: #E4E4E7;
+  --kenoki-text: #1D1D1F;
+  --kenoki-text-secondary: #4A4A4F;
+  --kenoki-text-muted: #8A8A93;
+  --kenoki-glass: rgba(255, 255, 255, 0.65);
+}
+
+/* Dark theme (overlay) */
+[data-theme="dark"], .theme-dark {
+  --kenoki-bg: #1D1D1F;
+  --kenoki-bg-secondary: #232327;
+  --kenoki-surface: #2B2B30;
+  --kenoki-border: #3A3A40;
+  --kenoki-text: #F4F4F4;
+  --kenoki-text-secondary: #CFCFD6;
+  --kenoki-text-muted: #9A9AA3;
+  --kenoki-glass: rgba(30, 30, 34, 0.65);
+}
+
+/* Tree-specific tokens (dark theme) */
+[data-theme="dark"], .theme-dark {
+  --kenoki-spine: rgba(172, 203, 238, 0.3);
+  --kenoki-spine-done: rgba(172, 203, 238, 0.6);
+  --kenoki-spine-active: #ACCBEE;
+  --kenoki-spine-pending: rgba(172, 203, 238, 0.15);
+  --kenoki-dot-done: #9FC2EA;
+  --kenoki-dot-active: #ACCBEE;
+  --kenoki-dot-pending: rgba(172, 203, 238, 0.3);
+}
