@@ -34,6 +34,16 @@ interface CLIInstallProgress {
   message: string;
 }
 
+interface CLIOutputChunk {
+  processId: string;
+  chunk: string;
+}
+
+interface CLIProcessExit {
+  processId: string;
+  exitCode: number;
+}
+
 // ============================================================================
 // LEGACY AUTH TYPES (for backward compatibility)
 // ============================================================================
@@ -84,6 +94,14 @@ interface ElectronAPI {
     onAuthOutput: (cb: (data: CLIAuthOutput) => void) => () => void;
     // Listen for install progress
     onInstallProgress: (cb: (data: CLIInstallProgress) => void) => () => void;
+    // Spawn Gemini CLI process
+    spawnGemini: () => Promise<{ success: boolean; processId?: string; error?: string }>;
+    // Kill Gemini CLI process
+    killGemini: (processId: string) => Promise<{ success: boolean; error?: string }>;
+    // Listen for CLI output chunks
+    onOutputChunk: (cb: (data: CLIOutputChunk) => void) => () => void;
+    // Listen for CLI process exit
+    onProcessExit: (cb: (data: CLIProcessExit) => void) => () => void;
   };
 
   // Provider BrowserView methods - ALL providers use BrowserView with their official websites

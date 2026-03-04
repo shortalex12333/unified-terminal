@@ -4,6 +4,16 @@ import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron';
 // TYPE DEFINITIONS
 // ============================================================================
 
+interface CLIOutputChunk {
+  processId: string;
+  chunk: string;
+}
+
+interface CLIProcessExit {
+  processId: string;
+  exitCode: number;
+}
+
 interface InjectionResult {
   success: boolean;
   strategy?: string;
@@ -801,6 +811,55 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.on('cli:install-progress', handler);
       return () => {
         ipcRenderer.removeAllListeners('cli:install-progress');
+      };
+    },
+
+    /**
+     * Spawn Gemini CLI process
+     */
+    spawnGemini: (): Promise<{
+      success: boolean;
+      processId?: string;
+      error?: string;
+    }> => {
+      return ipcRenderer.invoke('cli:spawn-gemini');
+    },
+
+    /**
+     * Kill Gemini CLI process
+     */
+    killGemini: (processId: string): Promise<{
+      success: boolean;
+      error?: string;
+    }> => {
+      return ipcRenderer.invoke('cli:kill-gemini', processId);
+    },
+
+    /**
+     * Listen for CLI output chunks
+     */
+    onOutputChunk: (cb: (data: {
+      processId: string;
+      chunk: string;
+    }) => void): (() => void) => {
+      const handler = (_event: IpcRendererEvent, data: CLIOutputChunk) => cb(data);
+      ipcRenderer.on('cli:output-chunk', handler);
+      return () => {
+        ipcRenderer.removeListener('cli:output-chunk', handler);
+      };
+    },
+
+    /**
+     * Listen for CLI process exit
+     */
+    onProcessExit: (cb: (data: {
+      processId: string;
+      exitCode: number;
+    }) => void): (() => void) => {
+      const handler = (_event: IpcRendererEvent, data: CLIProcessExit) => cb(data);
+      ipcRenderer.on('cli:process-exit', handler);
+      return () => {
+        ipcRenderer.removeListener('cli:process-exit', handler);
       };
     },
   },

@@ -15,6 +15,7 @@ import {
   HandlerDetails,
   PermissionRequestHandlerHandlerDetails,
 } from 'electron';
+import * as os from 'os';
 import {
   injectText,
   triggerSend,
@@ -728,6 +729,45 @@ app.whenReady().then(() => {
   // Initialize Conductor System (Tier 1 Router)
   console.log('[App] Initializing Conductor routing system...');
   const conductor = getConductor();
+
+  // Background auto-install (Option A: non-blocking during startup)
+  (async () => {
+    try {
+      const systemProfile = await scanSystem();
+      const missingTools = Object.entries(systemProfile.tools)
+        .filter(([_, tool]) => !tool.installed)
+        .map(([name]) => name);
+
+      if (missingTools.length > 0) {
+        console.log(`[App] Found ${missingTools.length} missing CLIs. Starting background installer...`);
+        console.log(`[App] Missing: ${missingTools.join(', ')}`);
+
+        // Run installer in background (non-blocking)
+        const progressCallback = (progress: InstallProgress): void => {
+          console.log(`[App] Install progress: ${progress.currentStep} [${progress.stepIndex}/${progress.totalSteps}] - ${Math.round(progress.percentComplete)}%`);
+          if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.send('system:install-progress', progress);
+          }
+        };
+
+        const result = await installMissingTools(progressCallback);
+        console.log('[App] Background installer complete:', {
+          success: result.success,
+          installed: result.installedTools.length,
+          failed: result.failedTools.length,
+        });
+
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('system:install-complete', result);
+        }
+      } else {
+        console.log('[App] All CLIs already installed');
+      }
+    } catch (err) {
+      console.error('[App] Background installer error:', err);
+    }
+  })(); // Fire-and-forget, doesn't block app startup
+
   conductor.initialize().then(() => {
     console.log('[App] Conductor initialized successfully');
   }).catch((err) => {
@@ -2103,6 +2143,93 @@ ipcMain.handle('auth:sign-out', async (
 ): Promise<{ success: boolean; error?: string }> => {
   console.log(`[IPC] auth:sign-out called: ${tool}`);
   return signOut(tool);
+});
+
+// ============================================================================
+// CLI PROCESS MANAGEMENT FOR GEMINI (Gate 18)
+// ============================================================================
+
+/**
+ * IPC: Spawn Gemini CLI process
+ */
+ipcMain.handle('cli:spawn-gemini', async (): Promise<{
+  success: boolean;
+  processId?: string;
+  error?: string;
+}> => {
+  try {
+    const runner = getCLIRunner();
+    const processId = runner.spawn('gemini', [], {
+      cwd: os.homedir(),
+    });
+
+    console.log(`[IPC] Spawned Gemini CLI: ${processId}`);
+
+    // Listen for output from this process
+    runner.on('output', (output: ProcessOutput) => {
+      if (output.processId === processId && mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('cli:output-chunk', {
+          processId,
+          chunk: output.data,
+        });
+      }
+    });
+
+    // Listen for process exit
+    runner.on('status', (status: ProcessStatusEvent) => {
+      if (status.processId === processId && mainWindow && !mainWindow.isDestroyed()) {
+        if (status.status === 'completed' || status.status === 'failed') {
+          mainWindow.webContents.send('cli:process-exit', {
+            processId,
+            exitCode: status.exitCode || 0,
+          });
+        }
+      }
+    });
+
+    return { success: true, processId };
+  } catch (error) {
+    console.error('[IPC] Failed to spawn Gemini CLI:', error);
+    return { success: false, error: String(error) };
+  }
+});
+
+/**
+ * IPC: Kill Gemini CLI process
+ */
+ipcMain.handle('cli:kill-gemini', async (
+  _event,
+  processId: string
+): Promise<{ success: boolean; error?: string }> => {
+  try {
+    const runner = getCLIRunner();
+    runner.kill(processId);
+    console.log(`[IPC] Killed Gemini CLI: ${processId}`);
+    return { success: true };
+  } catch (error) {
+    console.error('[IPC] Failed to kill Gemini CLI:', error);
+    return { success: false, error: String(error) };
+  }
+});
+
+/**
+ * IPC: Send input to running Gemini CLI process
+ */
+ipcMain.handle('cli:send-input', async (
+  _event,
+  provider: string,
+  message: string
+): Promise<void> => {
+  if (provider === 'gemini') {
+    try {
+      const runner = getCLIRunner();
+      console.log(`[IPC] Sending to Gemini CLI: ${message}`);
+      // TODO: Implement stdin writing in cli-runner
+      // For now, just log the message
+    } catch (error) {
+      console.error('[IPC] Failed to send input:', error);
+    }
+  }
 });
 
 // ============================================================================

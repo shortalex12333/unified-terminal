@@ -1,0 +1,27 @@
+{
+  "name": "token-threshold-check",
+  "description": "Verify agent token usage against per-model limits (Claude, Gemini, Codex)",
+  "checkScript": "check_tokens.py",
+  "stepType": "resource",
+  "applicableCardTypes": ["AgentCard"],
+  "failureMode": "HARD",
+  "allowSkip": false,
+  "allowRetry": true,
+  "confidence": 0.95,
+  "evidence": {
+    "required": true,
+    "format": "json",
+    "fields": ["modelName", "tokensUsed", "threshold", "percentageUsed"]
+  },
+  "timeout": 10,
+  "retryCount": 1,
+  "activation": {
+    "trigger": "every_spawn",
+    "condition": "agentTier !== null"
+  },
+  "threshold": {
+    "claude-sonnet-4": 110000,
+    "claude-opus-4": 200000,
+    "gemini-2.0-flash": 80000
+  }
+}

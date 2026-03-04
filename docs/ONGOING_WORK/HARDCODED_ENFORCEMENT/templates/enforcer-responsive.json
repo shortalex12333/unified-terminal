@@ -1,0 +1,28 @@
+{
+  "name": "responsive-design-check",
+  "description": "Verify responsive design at 3 viewports (mobile, tablet, desktop) using Playwright",
+  "checkScript": "check_responsive.py",
+  "stepType": "frontend",
+  "applicableCardTypes": ["FeatureCard"],
+  "failureMode": "SOFT",
+  "allowSkip": true,
+  "allowRetry": true,
+  "confidence": 0.75,
+  "evidence": {
+    "required": true,
+    "format": "screenshot",
+    "fields": ["viewportWidth", "viewportHeight", "screenshotPath", "fileSize"]
+  },
+  "timeout": 45,
+  "retryCount": 2,
+  "activation": {
+    "trigger": "after_build",
+    "condition": "hasReactComponents === true"
+  },
+  "viewports": [
+    { "name": "mobile", "width": 375, "height": 667 },
+    { "name": "tablet", "width": 768, "height": 1024 },
+    { "name": "desktop", "width": 1920, "height": 1080 }
+  ],
+  "minScreenshotSize": 1024
+}

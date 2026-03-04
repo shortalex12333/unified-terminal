@@ -1,0 +1,22 @@
+{
+  "name": "build-artifact-check",
+  "description": "Verify build artifacts exist (dist/ contains .html, .js, .css)",
+  "checkScript": "check_build_artifact.py",
+  "stepType": "build",
+  "applicableCardTypes": ["FaultCard", "WorkOrderCard"],
+  "failureMode": "HARD",
+  "allowSkip": false,
+  "allowRetry": true,
+  "confidence": 1.0,
+  "evidence": {
+    "required": true,
+    "format": "json",
+    "fields": ["fileCount", "extensions", "totalSize"]
+  },
+  "timeout": 30,
+  "retryCount": 2,
+  "activation": {
+    "trigger": "after_npm_build",
+    "condition": "buildCommand !== null"
+  }
+}

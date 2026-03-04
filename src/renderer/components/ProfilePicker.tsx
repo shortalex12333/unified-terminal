@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { ProviderState } from './App';
 
 export type Provider = 'chatgpt' | 'gemini' | 'claude';
 
@@ -35,7 +36,15 @@ const PROVIDERS: ProviderProfile[] = [
 ];
 
 interface Props {
-  onSelectProvider: (provider: Provider) => void;
+  onSelectProvider: (state: ProviderState) => void;
+}
+
+function getProviderMode(provider: Provider): 'cli' | 'browserview' {
+  // Gemini can use CLI, others use BrowserView
+  if (provider === 'gemini') {
+    return 'cli';
+  }
+  return 'browserview';
 }
 
 export default function ProfilePicker({ onSelectProvider }: Props) {
@@ -52,13 +61,33 @@ export default function ProfilePicker({ onSelectProvider }: Props) {
     setIsLoading(true);
 
     try {
-      // All providers use BrowserView - just tell main process to load the provider
-      const result = await window.electronAPI?.providerView?.show?.(provider);
-      if (result?.success) {
-        onSelectProvider(provider);
+      const providerMode = getProviderMode(provider);
+
+      if (providerMode === 'cli') {
+        // Spawn Gemini CLI
+        const result = await window.electronAPI?.cli?.spawnGemini?.();
+        if (result?.success && result.processId) {
+          onSelectProvider({
+            provider,
+            providerType: 'cli',
+            processId: result.processId,
+          });
+        } else {
+          console.error('[ProfilePicker] Failed to spawn Gemini CLI:', result?.error);
+          setSelectedProvider(null);
+        }
       } else {
-        console.error('[ProfilePicker] Failed to show provider:', result?.error);
-        setSelectedProvider(null);
+        // Use BrowserView for ChatGPT, Claude
+        const result = await window.electronAPI?.providerView?.show?.(provider);
+        if (result?.success) {
+          onSelectProvider({
+            provider,
+            providerType: 'browserview',
+          });
+        } else {
+          console.error('[ProfilePicker] Failed to show provider:', result?.error);
+          setSelectedProvider(null);
+        }
       }
     } catch (err) {
       console.error('[ProfilePicker] Error:', err);

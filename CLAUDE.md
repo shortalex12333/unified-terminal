@@ -350,8 +350,18 @@ docs/
 │   │   ├── AGENT-ONBOARDING.md      # Agent bootstrap document
 │   │   ├── FRAMEWORK.md             # 4-mode methodology
 │   │   └── ORCHESTRATION-MODEL.md   # Claude as PM, not worker
-│   └── CLI_AUTH/                # CLI Authentication (NEW)
-│       └── GATE-15-16-CLI-AUTH.md   # ✅ Gemini OAuth + AuthScreen
+│   ├── CLI_AUTH/                # CLI Authentication
+│   │   └── GATE-15-16-CLI-AUTH.md   # ✅ Gemini OAuth + AuthScreen
+│   └── ADAPTORS/                # Runtime Adapters (Instance 2)
+│       ├── src/                 # Adapter source code
+│       │   ├── types.ts         # Universal types
+│       │   ├── permissions.ts   # Tool permissions
+│       │   ├── factory.ts       # Adapter factory
+│       │   ├── codex/adapter.ts # Codex CLI adapter
+│       │   └── gemini/adapter.ts # Gemini CLI adapter
+│       ├── tests/harness.ts     # 34/34 tests passing
+│       ├── COMPATIBILITY.md     # Plugin compatibility matrix
+│       └── INSTANCE-2-ADAPTERS.md # ✅ Full specification
 ├── research/
 │   └── plugins/                 # Plugin research
 └── plans/

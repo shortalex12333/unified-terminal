@@ -1,0 +1,23 @@
+{
+  "name": "uninstall-verify-check",
+  "description": "Verify package uninstallation — confirm node_modules/{pkg} is gone after npm uninstall",
+  "checkScript": "check_uninstall.py",
+  "stepType": "dependency",
+  "applicableCardTypes": ["MaintenanceCard"],
+  "failureMode": "HARD",
+  "allowSkip": false,
+  "allowRetry": true,
+  "confidence": 1.0,
+  "evidence": {
+    "required": true,
+    "format": "json",
+    "fields": ["packageName", "wasRemoved", "nodeModulesPath"]
+  },
+  "timeout": 20,
+  "retryCount": 1,
+  "activation": {
+    "trigger": "after_npm_uninstall",
+    "condition": "uninstalledPackages.length > 0"
+  },
+  "packages": []
+}
