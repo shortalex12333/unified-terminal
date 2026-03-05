@@ -5,6 +5,13 @@
  * The fuel gauge shows users how much of their session budget remains and
  * warns when resources are running low.
  *
+ * Note: Fuel gauge calculation logic (percentage, labels, warnings) lives in
+ * the renderer component (FuelGauge.tsx) which receives FuelState via IPC.
+ * The status-agent module only defines the FuelState type and passes it
+ * through -- there are no exported production functions for fuel calculations.
+ * These tests verify the FuelState contract and calculation helpers that
+ * mirror the component's display logic.
+ *
  * Run with: npx ts-node tests/fuel-gauge.test.ts
  */
 

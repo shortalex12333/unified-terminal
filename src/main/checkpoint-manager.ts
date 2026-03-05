@@ -93,6 +93,13 @@ export class CheckpointManager extends EventEmitter {
 
   /**
    * Subscribe to system events for automatic checkpoint triggering.
+   *
+   * Note: Blocking checkpoints (PLAN_REVIEW, FIRST_OUTPUT, PRE_DEPLOY) are handled
+   * explicitly by send-interceptor.ts and step-scheduler.ts via their respective
+   * await calls (waitForPlanReview, waitForFirstOutput, waitForPreDeploy).
+   * This event-based path only fires non-blocking checkpoints (PROGRESS_CHECK)
+   * because blocking checkpoints require the caller to await a Promise -- something
+   * an event listener cannot enforce.
    */
   subscribeToEvents(): void {
     // Subscribe to all events and check if they trigger checkpoints
@@ -111,20 +118,22 @@ export class CheckpointManager extends EventEmitter {
 
   /**
    * Handle a checkpoint triggered by an event.
+   *
+   * Only non-blocking checkpoints (priority === 'normal', e.g. PROGRESS_CHECK)
+   * are processed here. Blocking checkpoints (PLAN_REVIEW, FIRST_OUTPUT,
+   * PRE_DEPLOY) are skipped because they require the execution flow to await
+   * a response -- that awaiting is done by the explicit waitFor* methods
+   * called from send-interceptor.ts and step-scheduler.ts.
    */
   private async handleEventCheckpoint(event: StatusEvent, query: UserQuery): Promise<void> {
     const checkpointName = query.agentHandle.replace('checkpoint:', '').toUpperCase();
     console.log(`[CheckpointManager] Event triggered checkpoint: ${checkpointName}`);
 
-    // For blocking checkpoints, we need to somehow pause execution
-    // This is handled by the caller waiting on waitForCheckpoint()
-    // The event-based trigger is mainly for non-blocking progress checks
-
     if (query.priority === 'normal') {
       // Non-blocking - send query and continue
       this.emitQuery(query);
     }
-    // Blocking checkpoints are handled via explicit waitFor* calls
+    // Blocking checkpoints intentionally skipped here -- see class JSDoc above.
   }
 
   // ==========================================================================

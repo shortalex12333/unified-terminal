@@ -142,8 +142,9 @@ declare interface ElectronAPI {
   // Platform info
   platform: NodeJS.Platform;
 
-  // CLI Provider methods (Gemini, Claude - isolated auth systems)
+  // CLI Provider methods (Codex, Claude - isolated auth systems)
   // ChatGPT uses BrowserView web login and does NOT go through this
+  // NOTE: Gemini removed (shelved feature)
   cli: {
     // Check status of all CLI providers
     checkAllStatus: () => Promise<ProviderStatus[]>;
@@ -165,10 +166,6 @@ declare interface ElectronAPI {
     onAuthOutput: (cb: (data: CLIAuthOutput) => void) => () => void;
     // Listen for install progress
     onInstallProgress: (cb: (data: CLIInstallProgress) => void) => () => void;
-    // Spawn Gemini CLI process
-    spawnGemini: () => Promise<{ success: boolean; processId?: string; error?: string }>;
-    // Kill Gemini CLI process
-    killGemini: (processId: string) => Promise<{ success: boolean; error?: string }>;
     // Listen for CLI output chunks
     onOutputChunk: (cb: (data: CLIOutputChunk) => void) => () => void;
     // Listen for CLI process exit
@@ -176,9 +173,9 @@ declare interface ElectronAPI {
   };
 
   // Provider BrowserView methods - ALL providers use BrowserView with their official websites
-  // chatgpt -> chatgpt.com, gemini -> gemini.google.com, claude -> claude.ai
+  // chatgpt -> chatgpt.com, claude -> claude.ai (Gemini shelved)
   providerView: {
-    // Show BrowserView for a provider (chatgpt, gemini, claude)
+    // Show BrowserView for a provider (chatgpt, claude)
     show: (provider: string) => Promise<{ success: boolean; error?: string }>;
     // Hide the BrowserView
     hide: () => Promise<{ success: boolean }>;

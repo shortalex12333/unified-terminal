@@ -195,17 +195,16 @@ const WINDOW_WIDTH = 1400;
 const WINDOW_HEIGHT = 900;
 
 // Provider URLs - ALL providers use BrowserView with their official websites
-type ProviderType = 'chatgpt' | 'gemini' | 'claude';
+// NOTE: Gemini removed (shelved feature)
+type ProviderType = 'chatgpt' | 'claude';
 const PROVIDER_URLS: Record<ProviderType, string> = {
   chatgpt: 'https://chatgpt.com',
-  gemini: 'https://gemini.google.com',
   claude: 'https://claude.ai',
 };
 
 // Session partitions - each provider gets isolated cookies/storage
 const SESSION_PARTITIONS: Record<ProviderType, string> = {
   chatgpt: 'persist:chatgpt',
-  gemini: 'persist:gemini',
   claude: 'persist:claude',
 };
 
@@ -2217,100 +2216,7 @@ ipcMain.handle('auth:sign-out', async (
   return signOut(tool);
 });
 
-// ============================================================================
-// CLI PROCESS MANAGEMENT FOR GEMINI (Gate 18)
-// ============================================================================
-
-/**
- * IPC: Spawn Gemini CLI process
- */
-ipcMain.handle('cli:spawn-gemini', async (): Promise<{
-  success: boolean;
-  processId?: string;
-  error?: string;
-}> => {
-  try {
-    const runner = getCLIRunner();
-    // Spawn with NO_BROWSER=true to enable manual authentication in terminal
-    const processId = runner.spawn('gemini', [], {
-      cwd: os.homedir(),
-      env: {
-        ...process.env,
-        NO_BROWSER: 'true',  // Enable manual auth via stdin
-      },
-    });
-
-    console.log(`[IPC] Spawned Gemini CLI: ${processId}`);
-
-    // Listen for output from this process
-    runner.on('output', (output: ProcessOutput) => {
-      if (output.processId === processId && mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.send('cli:output-chunk', {
-          processId,
-          chunk: output.data,
-        });
-      }
-    });
-
-    // Listen for process exit
-    runner.on('status', (status: ProcessStatusEvent) => {
-      if (status.processId === processId && mainWindow && !mainWindow.isDestroyed()) {
-        if (status.status === 'completed' || status.status === 'failed') {
-          mainWindow.webContents.send('cli:process-exit', {
-            processId,
-            exitCode: status.exitCode || 0,
-          });
-        }
-      }
-    });
-
-    return { success: true, processId };
-  } catch (error) {
-    console.error('[IPC] Failed to spawn Gemini CLI:', error);
-    return { success: false, error: String(error) };
-  }
-});
-
-/**
- * IPC: Kill Gemini CLI process
- */
-ipcMain.handle('cli:kill-gemini', async (
-  _event,
-  processId: string
-): Promise<{ success: boolean; error?: string }> => {
-  try {
-    const runner = getCLIRunner();
-    runner.kill(processId);
-    console.log(`[IPC] Killed Gemini CLI: ${processId}`);
-    return { success: true };
-  } catch (error) {
-    console.error('[IPC] Failed to kill Gemini CLI:', error);
-    return { success: false, error: String(error) };
-  }
-});
-
-/**
- * IPC: Send input to running Gemini CLI process
- */
-ipcMain.handle('cli:send-input', async (
-  _event,
-  provider: string,
-  processId: string,
-  message: string
-): Promise<{ success: boolean; error?: string }> => {
-  if (provider === 'gemini') {
-    try {
-      const runner = getCLIRunner();
-      const success = runner.writeToStdin(processId, message);
-      console.log(`[IPC] Sent to Gemini CLI (${processId}): ${message.trim()}`);
-      return { success };
-    } catch (error) {
-      console.error('[IPC] Failed to send input:', error);
-      return { success: false, error: String(error) };
-    }
-  }
-  return { success: false, error: 'Unknown provider' };
-});
+// NOTE: Gemini CLI handlers removed (shelved feature)
 
 /**
  * IPC: Open URL in system browser (for OAuth flows)

@@ -104,7 +104,8 @@ interface InstallResult {
 }
 
 // CLI Authentication types (Gate 6)
-type CLITool = 'codex' | 'claude-code' | 'gemini';
+// NOTE: Gemini removed (shelved feature)
+type CLITool = 'codex' | 'claude-code';
 type AuthPromptType = 'oauth' | 'token' | 'tos' | 'question';
 
 interface AuthPrompt {
@@ -789,11 +790,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
 
   // ============================================================================
-  // CLI PROVIDER METHODS (Installation + Authentication for Gemini/Claude)
+  // CLI PROVIDER METHODS (Installation + Authentication for Claude)
   // ============================================================================
 
   /**
-   * CLI API for managing CLI providers (Gemini, Claude)
+   * CLI API for managing CLI providers (Codex, Claude)
    * ChatGPT uses BrowserView web login - NOT this system
    */
   cli: {
@@ -887,26 +888,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
       };
     },
 
-    /**
-     * Spawn Gemini CLI process
-     */
-    spawnGemini: (): Promise<{
-      success: boolean;
-      processId?: string;
-      error?: string;
-    }> => {
-      return ipcRenderer.invoke('cli:spawn-gemini');
-    },
-
-    /**
-     * Kill Gemini CLI process
-     */
-    killGemini: (processId: string): Promise<{
-      success: boolean;
-      error?: string;
-    }> => {
-      return ipcRenderer.invoke('cli:kill-gemini', processId);
-    },
+    // NOTE: spawnGemini/killGemini removed (shelved feature)
 
     /**
      * Listen for CLI output chunks
@@ -942,7 +924,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // ============================================================================
 
   /**
-   * Provider BrowserView API - ALL providers (ChatGPT, Gemini, Claude) use BrowserView
+   * Provider BrowserView API - ALL providers (ChatGPT, Claude) use BrowserView
    * Each provider loads their official website for authentication and chat
    */
   providerView: {

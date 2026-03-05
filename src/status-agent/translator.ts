@@ -628,7 +628,7 @@ const gitTranslations: TranslationMap = {
   }),
 
   'git:complete': () => ({
-    text: 'Git operation complete',
+    text: 'Changes saved successfully',
     icon: '✅',
     state: 'done' as StatusState,
   }),
@@ -738,7 +738,7 @@ export function translate(event: StatusEvent): StatusLine {
   // Build complete StatusLine with defaults
   const statusLine: StatusLine = {
     id: generateId(),
-    text: partial.text,
+    text: truncate(partial.text),
     expandable: partial.expandable ?? false,
     expandedText: partial.expandedText ?? null,
     state: partial.state ?? 'active',

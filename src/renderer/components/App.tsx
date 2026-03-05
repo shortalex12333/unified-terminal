@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import StartingScreen from './StartingScreen';
 import ProfilePicker, { Provider } from './ProfilePicker';
 import ChatInterface from './ChatInterface';
-import TerminalUI from './TerminalUI';
+// NOTE: TerminalUI removed - Gemini shelved
 import CircuitBreakerModal from './CircuitBreakerModal';
 import BuildPanel, { PanelState } from './BuildPanel';
 import TopBarPill from './TopBarPill';
@@ -93,20 +93,8 @@ export default function App() {
           return <ProfilePicker onSelectProvider={handleSelectProvider} />;
         }
 
-        if (providerState.providerType === 'cli') {
-          return (
-            <TerminalUI
-              provider={providerState.provider as 'gemini'}
-              processId={providerState.processId!}
-              onSwitchAI={() => {
-                window.electronAPI?.cli?.killGemini?.(providerState.processId!);
-                setProviderState(null);
-                setScreen('select-provider');
-              }}
-            />
-          );
-        }
-
+        // NOTE: CLI provider type (Gemini) removed - shelved feature
+        // All providers now use BrowserView (ChatGPT, Claude)
         return (
           <ChatInterface
             provider={providerState.provider}

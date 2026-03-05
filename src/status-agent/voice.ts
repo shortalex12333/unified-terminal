@@ -60,6 +60,9 @@ export const BANNED_WORDS: readonly string[] = [
   'regex', 'regexp', 'hash', 'encrypt', 'decrypt', 'serialize', 'deserialize',
   'parse', 'stringify', 'encode', 'decode', 'compress', 'decompress',
   'validate', 'sanitize', 'normalize', 'payload', 'metadata', 'config',
+
+  // CLI / dev environment
+  'exit code', 'session ID', 'node_modules', 'npm', 'git',
 ] as const;
 
 /**
@@ -197,11 +200,25 @@ export function getPreferred(word: string): string {
  * Replaces banned words with preferred alternatives.
  * Preserves punctuation and spacing.
  */
+/**
+ * Compound banned terms that span multiple words.
+ * Must be checked before per-word splitting.
+ */
+const COMPOUND_BANNED = ['exit code', 'session id', 'context window', 'node_modules', 'stack trace',
+  'null pointer', 'memory leak', 'buffer overflow', 'load balancer', 'Claude Code'] as const;
+
 export function sanitize(text: string): string {
   if (!text) return text;
 
+  // Check compound banned terms first (before splitting into words)
+  let compoundCleaned = text;
+  for (const compound of COMPOUND_BANNED) {
+    const regex = new RegExp(compound, 'gi');
+    compoundCleaned = compoundCleaned.replace(regex, '');
+  }
+
   // Split preserving punctuation
-  const tokens = text.split(/(\s+|[.,!?;:'"()\[\]{}])/);
+  const tokens = compoundCleaned.split(/(\s+|[.,!?;:'"()\[\]{}])/);
 
   const sanitized = tokens.map(token => {
     // Skip whitespace and punctuation
