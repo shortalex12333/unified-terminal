@@ -359,3 +359,33 @@ export const enforcerEvents = {
   checkRun: (checkName: string, exitCode: number, durationMs: number) =>
     emitEvent('enforcer', 'check-run', { checkName, exitCode, durationMs }),
 };
+
+export const checkpointEvents = {
+  /** Emitted when a checkpoint query is sent to user */
+  querySent: (queryId: string, checkpointName: string, priority: string) =>
+    emitEvent('checkpoint', 'query-sent', { queryId, checkpointName, priority }),
+
+  /** Emitted when user responds to checkpoint */
+  response: (checkpointName: string, value: string, proceed: boolean) =>
+    emitEvent('checkpoint', 'response', { checkpointName, value, proceed }),
+
+  /** Emitted when checkpoint times out */
+  timeout: (checkpointName: string, queryId: string) =>
+    emitEvent('checkpoint', 'timeout', { checkpointName, queryId }),
+
+  /** Emitted when waiting for plan review */
+  planReviewWaiting: (planId: string) =>
+    emitEvent('checkpoint', 'plan-review-waiting', { planId }),
+
+  /** Emitted when waiting for first output review */
+  firstOutputWaiting: (stepId: number) =>
+    emitEvent('checkpoint', 'first-output-waiting', { stepId }),
+
+  /** Emitted when waiting for deploy approval */
+  preDeployWaiting: (stepId: number, target: string) =>
+    emitEvent('checkpoint', 'pre-deploy-waiting', { stepId, target }),
+
+  /** Emitted for progress check (non-blocking) */
+  progressCheck: (stepsCompleted: number, totalSteps: number) =>
+    emitEvent('checkpoint', 'progress-check', { stepsCompleted, totalSteps }),
+};

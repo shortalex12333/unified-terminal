@@ -305,6 +305,19 @@ declare interface ElectronAPI {
 
     /** Dismiss the tree (mark complete, return to idle) */
     dismissTree: () => void;
+
+    // ─────────────────────────────────────────────────────────────────────
+    // Invoke Methods (request-response)
+    // ─────────────────────────────────────────────────────────────────────
+
+    /** Get current status tree state (for initial render) */
+    getTree: () => Promise<unknown>;
+
+    /** Get pending user queries */
+    getPendingQueries: () => Promise<unknown>;
+
+    /** Get current fuel state */
+    getFuel: () => Promise<unknown>;
   };
 }
 

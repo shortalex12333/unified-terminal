@@ -11,7 +11,8 @@
 import { EventEmitter } from 'events';
 import { ipcMain, BrowserWindow } from 'electron';
 import * as path from 'path';
-import { schedulerEvents } from './events';
+import { schedulerEvents, checkpointEvents } from './events';
+import { getCheckpointManager, CheckpointResult } from './checkpoint-manager';
 
 // Enforcement Engine (Phase 5: 10-step flow)
 import { gateCheck, buildSpine, compareSpines } from '../enforcement';
@@ -229,6 +230,12 @@ export class StepScheduler extends EventEmitter {
   /** Pending user decision promise resolver */
   private userDecisionResolver: ((decision: UserDecision) => void) | null = null;
 
+  /** Track if first output checkpoint has been shown */
+  private firstOutputShown: boolean = false;
+
+  /** Count of completed steps for progress checkpoint */
+  private completedStepCount: number = 0;
+
   constructor() {
     super();
     this.setupIPC();
@@ -279,6 +286,14 @@ export class StepScheduler extends EventEmitter {
     this.currentPlan = plan;
     this.stopped = false;
     this.steps.clear();
+
+    // Reset checkpoint state for this plan
+    this.firstOutputShown = false;
+    this.completedStepCount = 0;
+
+    // Reset checkpoint manager state
+    const checkpointManager = getCheckpointManager();
+    checkpointManager.reset();
 
     // Convert plan steps to runtime steps
     for (const step of plan.steps) {
@@ -476,6 +491,45 @@ export class StepScheduler extends EventEmitter {
       this.emit('step-failed', step);
       this.emitProgress(step, 0, step.error);
       return;
+    }
+
+    // ========================================================================
+    // CHECKPOINT: PRE_DEPLOY - Before any deploy action
+    // CRITICAL: Never auto-deploy. User MUST explicitly approve.
+    // ========================================================================
+    const checkpointManager = getCheckpointManager();
+    if (checkpointManager.isDeployAction(step.action)) {
+      // Determine deploy target from step detail or action
+      const deployTarget = this.extractDeployTarget(step);
+
+      checkpointEvents.preDeployWaiting(step.id, deployTarget);
+      const deployResult = await checkpointManager.waitForPreDeploy(step.id, deployTarget);
+
+      if (!deployResult.proceed) {
+        console.log(`[StepScheduler] Deploy checkpoint ${deployResult.value}: ${deployResult.reason || 'User declined'}`);
+
+        if (deployResult.value === 'review') {
+          // User wants to review first - skip this step but continue execution
+          step.status = 'skipped';
+          step.error = 'Skipped for review before deploy';
+          step.endedAt = new Date();
+          this.emit('step-skipped', step);
+          this.emitProgress(step, 0, 'Skipped - review requested');
+          schedulerEvents.stepSkipped(step.id, 'Review before deploy');
+          return;
+        }
+
+        // User cancelled the deploy
+        step.status = 'skipped';
+        step.error = 'Deploy cancelled by user';
+        step.endedAt = new Date();
+        this.emit('step-skipped', step);
+        this.emitProgress(step, 0, 'Deploy cancelled');
+        schedulerEvents.stepSkipped(step.id, 'Deploy cancelled by user');
+        return;
+      }
+
+      console.log('[StepScheduler] Deploy checkpoint approved, proceeding');
     }
 
     // Mark as running
@@ -726,6 +780,50 @@ export class StepScheduler extends EventEmitter {
 
       // Emit step done event to Status Agent
       schedulerEvents.stepDone(step.id, step.action);
+
+      // Update completed step count for progress checkpoint
+      this.completedStepCount++;
+
+      // ====================================================================
+      // CHECKPOINT: FIRST_OUTPUT - After first step produces visible output
+      // ====================================================================
+      if (!this.firstOutputShown && this.currentPlan) {
+        const checkpointManager = getCheckpointManager();
+        const outputSummary = this.summarizeStepOutput(step, result);
+
+        if (outputSummary) {
+          checkpointEvents.firstOutputWaiting(step.id);
+          const firstOutputResult = await checkpointManager.waitForFirstOutput(step.id, outputSummary);
+
+          if (!firstOutputResult.proceed) {
+            console.log(`[StepScheduler] First output checkpoint ${firstOutputResult.value}`);
+
+            if (firstOutputResult.value === 'restart') {
+              // User wants to start over - stop execution
+              this.stopped = true;
+              return;
+            } else if (firstOutputResult.value === 'modify') {
+              // User wants to adjust - allow conductor to replan
+              // For now, just log and continue
+              console.log('[StepScheduler] User requested modification at first output');
+            }
+          }
+
+          this.firstOutputShown = true;
+        }
+      }
+
+      // ====================================================================
+      // CHECKPOINT: PROGRESS_CHECK - Every 5 completed steps
+      // ====================================================================
+      if (this.currentPlan) {
+        const checkpointManager = getCheckpointManager();
+        checkpointManager.onStepComplete(
+          step.id,
+          this.completedStepCount,
+          this.currentPlan.steps.length
+        );
+      }
 
     } catch (error) {
       // Failed
@@ -1010,6 +1108,64 @@ export class StepScheduler extends EventEmitter {
   // ==========================================================================
   // UTILITIES
   // ==========================================================================
+
+  /**
+   * Summarize step output for the FIRST_OUTPUT checkpoint.
+   * Returns null if there's no meaningful output to show.
+   */
+  private summarizeStepOutput(step: RuntimeStep, result: any): string | null {
+    if (!result) return null;
+
+    // Check for files created/modified
+    const filesCreated = result?.filesCreated || result?._spineDiff?.filesAdded || [];
+    const filesModified = result?.filesModified || result?._spineDiff?.filesModified || [];
+
+    const parts: string[] = [];
+
+    if (filesCreated.length > 0) {
+      parts.push(`Created ${filesCreated.length} file(s): ${filesCreated.slice(0, 3).join(', ')}${filesCreated.length > 3 ? '...' : ''}`);
+    }
+
+    if (filesModified.length > 0) {
+      parts.push(`Modified ${filesModified.length} file(s): ${filesModified.slice(0, 3).join(', ')}${filesModified.length > 3 ? '...' : ''}`);
+    }
+
+    // If no files, check for output text
+    if (parts.length === 0) {
+      const output = typeof result === 'string' ? result : result?.output;
+      if (output && output.length > 10) {
+        parts.push(`Output: ${output.substring(0, 100)}${output.length > 100 ? '...' : ''}`);
+      }
+    }
+
+    if (parts.length === 0) return null;
+
+    return `Step ${step.id} (${step.action}):\n${parts.join('\n')}`;
+  }
+
+  /**
+   * Extract deploy target from step information.
+   * Used for the PRE_DEPLOY checkpoint message.
+   */
+  private extractDeployTarget(step: RuntimeStep): string {
+    const detail = step.detail.toLowerCase();
+    const action = step.action.toLowerCase();
+
+    // Common deploy targets
+    if (detail.includes('vercel') || action.includes('vercel')) return 'Vercel';
+    if (detail.includes('netlify') || action.includes('netlify')) return 'Netlify';
+    if (detail.includes('github pages') || detail.includes('gh-pages')) return 'GitHub Pages';
+    if (detail.includes('heroku') || action.includes('heroku')) return 'Heroku';
+    if (detail.includes('aws') || action.includes('aws')) return 'AWS';
+    if (detail.includes('gcp') || detail.includes('google cloud')) return 'Google Cloud';
+    if (detail.includes('azure') || action.includes('azure')) return 'Azure';
+    if (detail.includes('cloudflare') || action.includes('cloudflare')) return 'Cloudflare';
+    if (detail.includes('render') || action.includes('render')) return 'Render';
+    if (detail.includes('fly.io') || action.includes('fly')) return 'Fly.io';
+
+    // Default to generic
+    return 'production';
+  }
 
   /**
    * Build a dagProgress snapshot from the scheduler's internal step state.

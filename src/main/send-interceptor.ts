@@ -13,6 +13,8 @@ import { CHATGPT_SELECTORS } from '../utils/dom-selectors';
 import { fastPathCheck, fastPathCheckWithReason } from './fast-path';
 import { getConductor, ExecutionPlan } from './conductor';
 import { getStepScheduler } from './step-scheduler';
+import { getCheckpointManager } from './checkpoint-manager';
+import { checkpointEvents } from './events';
 
 // ============================================================================
 // TYPES
@@ -329,13 +331,41 @@ export async function routeMessage(text: string): Promise<{
     // Execute the plan via step scheduler
     if (plan.route === 'cli' || plan.route === 'hybrid') {
       const scheduler = getStepScheduler();
+      const checkpointManager = getCheckpointManager();
+      const planId = `plan-${Date.now()}`;
+
       // Convert plan format
       const schedulerPlan = {
-        planId: `plan-${Date.now()}`,
+        planId,
         name: `${plan.complexity} task`,
         steps: plan.plan.map(step => ({ ...step })),
         context: { estimatedMinutes: plan.estimated_minutes },
       };
+
+      // CHECKPOINT: PLAN_REVIEW - Wait for user approval before executing
+      // Only for non-trivial tasks (more than 1 step or medium+ complexity)
+      const needsReview = plan.plan.length > 1 || plan.complexity !== 'simple';
+
+      if (needsReview) {
+        const planSummary = `${plan.complexity} task with ${plan.plan.length} steps (est. ${plan.estimated_minutes} min):\n${plan.plan.map(s => `  - ${s.action}: ${s.detail}`).join('\n')}`;
+
+        checkpointEvents.planReviewWaiting(planId);
+        const reviewResult = await checkpointManager.waitForPlanReview(planId, planSummary);
+
+        if (!reviewResult.proceed) {
+          console.log(`[SendInterceptor] Plan review ${reviewResult.value}: ${reviewResult.reason || 'User declined'}`);
+
+          if (reviewResult.value === 'modify') {
+            // User wants to modify - fall through to web so they can rephrase
+            return { route: 'web', plan };
+          }
+
+          // User cancelled - don't execute anything
+          return { route: 'web', fastPath: false };
+        }
+
+        console.log('[SendInterceptor] Plan review approved, proceeding with execution');
+      }
 
       // Execute in background (don't await for hybrid)
       if (plan.route === 'hybrid') {
