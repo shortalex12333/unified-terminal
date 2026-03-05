@@ -1,0 +1,18 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "KENOKI_LANDING_PAGE/package.json",
+      "use": "@vercel/static-build",
+      "config": { "distDir": "dist" }
+    },
+    {
+      "src": "KENOKI_LANDING_PAGE/pages/api/**/*.ts",
+      "use": "@vercel/node"
+    }
+  ],
+  "routes": [
+    { "src": "/api/(.*)", "dest": "KENOKI_LANDING_PAGE/pages/api/$1.ts" },
+    { "src": "/(.*)", "dest": "KENOKI_LANDING_PAGE/dist/$1" }
+  ]
+}
