@@ -473,8 +473,14 @@ export class CheckpointManager extends EventEmitter {
 
   /**
    * Set up IPC handlers for checkpoint responses.
+   * Skips setup if ipcMain is not available (test environment).
    */
   private setupIPCHandlers(): void {
+    // Skip in test environment where ipcMain may not be available
+    if (!ipcMain || typeof ipcMain.on !== 'function') {
+      return;
+    }
+
     // Handle checkpoint response from renderer
     ipcMain.on(
       'checkpoint:response',
