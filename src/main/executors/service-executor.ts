@@ -10,6 +10,7 @@
 
 import { ipcMain, BrowserWindow } from 'electron';
 import { EventEmitter } from 'events';
+import { deployEvents } from '../events';
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -201,6 +202,12 @@ export class ServiceExecutor extends EventEmitter implements Executor {
 
     console.log(`[ServiceExecutor] Executing ${step.action} for service: ${serviceName}`);
 
+    // Emit deploy start event for Vercel deployment
+    const isDeployAction = step.action === 'deploy_vercel';
+    if (isDeployAction) {
+      deployEvents.start('vercel');
+    }
+
     try {
       // Show the service guide to the user
       await this.showServiceGuide(serviceName);
@@ -217,12 +224,23 @@ export class ServiceExecutor extends EventEmitter implements Executor {
 
       this.emit('connection-complete', serviceName, validationResult);
 
+      // Emit deploy complete event for Vercel (URL would come from actual deployment)
+      if (isDeployAction && validationResult.success) {
+        // Note: Actual URL would be populated by deployment process
+        deployEvents.complete('https://your-project.vercel.app');
+      }
+
       return validationResult;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       console.error(`[ServiceExecutor] Error connecting ${serviceName}:`, errorMessage);
 
       this.emit('error', error);
+
+      // Emit deploy error event for Vercel
+      if (isDeployAction) {
+        deployEvents.error(errorMessage);
+      }
 
       return {
         success: false,

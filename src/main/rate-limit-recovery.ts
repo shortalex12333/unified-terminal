@@ -10,6 +10,7 @@
 
 import { EventEmitter } from 'events';
 import { getStateManager, StateManager, TaskState } from './state-manager';
+import { rateLimitEvents } from './events';
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -227,9 +228,18 @@ export class RateLimitRecovery extends EventEmitter {
     // Persist deferred steps to state manager
     this.saveDeferredSteps();
 
-    // Emit events
+    // Emit events (internal)
     this.emit('rate-limited');
     this.emit('steps-deferred', deferred);
+
+    // Emit Status Agent event
+    rateLimitEvents.hit('chatgpt', POLL_INTERVAL_MS);
+
+    // Emit deferred event for each step
+    for (const step of deferred) {
+      const resumeAt = new Date(Date.now() + POLL_INTERVAL_MS);
+      rateLimitEvents.deferred(step.id, resumeAt.toISOString());
+    }
 
     // Notify user via console (renderer will handle UI)
     console.log(
@@ -340,6 +350,11 @@ export class RateLimitRecovery extends EventEmitter {
       scheduler.resumeDeferredSteps(steps);
 
       this.emit('steps-resumed', steps);
+
+      // Emit Status Agent resumed event for each step
+      for (const step of steps) {
+        rateLimitEvents.resumed(step.id);
+      }
 
       console.log(`[RateLimitRecovery] Resumed ${steps.length} deferred steps`);
     }

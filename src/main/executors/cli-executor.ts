@@ -12,6 +12,7 @@ import { spawn, ChildProcess } from 'child_process';
 import * as os from 'os';
 import * as path from 'path';
 import * as fs from 'fs';
+import { workerEvents } from '../events';
 
 // ============================================================================
 // TYPES
@@ -401,6 +402,9 @@ export class CLIExecutor implements Executor {
       console.log(`[CLIExecutor] Action: ${step.action}`);
       console.log(`[CLIExecutor] Project: ${step.projectDir}`);
 
+      // Emit spawn event to Status Agent
+      workerEvents.spawn(step.id, step.action, step.projectDir);
+
       // Spawn Codex process
       this.process = spawn('codex', args, {
         env: this.buildEnv(),
@@ -450,6 +454,24 @@ export class CLIExecutor implements Executor {
 
         if (!result.success) {
           result.error = parsed.errorMessage || stderr || `Process exited with code ${code}`;
+          // Emit error event to Status Agent
+          workerEvents.error(step.id, result.error);
+        }
+
+        // Emit complete event to Status Agent
+        workerEvents.complete(
+          step.id,
+          result.success,
+          result.filesCreated.length,
+          result.filesModified.length
+        );
+
+        // Emit individual file events
+        for (const file of result.filesCreated) {
+          workerEvents.fileCreated(file);
+        }
+        for (const file of result.filesModified) {
+          workerEvents.fileModified(file);
         }
 
         resolve(result);
@@ -486,6 +508,9 @@ export class CLIExecutor implements Executor {
             }
           }, 5000);
         }
+
+        // Emit timeout event to Status Agent
+        workerEvents.timeout(step.id, timeout);
 
         resolve({
           success: false,

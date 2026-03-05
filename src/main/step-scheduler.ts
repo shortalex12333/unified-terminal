@@ -10,6 +10,7 @@
 
 import { EventEmitter } from 'events';
 import { ipcMain, BrowserWindow } from 'electron';
+import { schedulerEvents } from './events';
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -254,6 +255,9 @@ export class StepScheduler extends EventEmitter {
     console.log(`[StepScheduler] Starting execution of plan: ${plan.planId}`);
     const startTime = Date.now();
 
+    // Emit plan start event
+    schedulerEvents.planStart(plan.planId, plan.steps.length);
+
     // Initialize runtime state
     this.currentPlan = plan;
     this.stopped = false;
@@ -293,6 +297,9 @@ export class StepScheduler extends EventEmitter {
     console.log(`[StepScheduler] Plan ${plan.planId} complete:`, result.summary);
     this.emit('plan-complete', result);
     this.emitIPC('step:plan-complete', result);
+
+    // Emit plan complete event to Status Agent
+    schedulerEvents.planComplete(plan.planId, result.success, result.summary);
 
     this.currentPlan = null;
     return result;
@@ -394,6 +401,9 @@ export class StepScheduler extends EventEmitter {
         step.error = 'Skipped due to dependency failure';
         this.emit('step-skipped', step);
         this.emitProgress(step, 0, 'Skipped - dependency failed');
+
+        // Emit step skipped event to Status Agent
+        schedulerEvents.stepSkipped(step.id, 'Dependency failed');
         continue;
       }
 
@@ -444,6 +454,9 @@ export class StepScheduler extends EventEmitter {
     this.emit('step-start', step);
     this.emitProgress(step, 0, 'Starting...');
 
+    // Emit step start event to Status Agent
+    schedulerEvents.stepStart(step.id, step.action, step.detail);
+
     try {
       // Execute the step
       const result = await executor.execute(step, context);
@@ -457,6 +470,9 @@ export class StepScheduler extends EventEmitter {
       console.log(`[StepScheduler] Step ${step.id} completed successfully`);
       this.emit('step-done', step);
       this.emitProgress(step, 100, 'Complete');
+
+      // Emit step done event to Status Agent
+      schedulerEvents.stepDone(step.id, step.action);
 
     } catch (error) {
       // Failed
@@ -476,12 +492,18 @@ export class StepScheduler extends EventEmitter {
           errorContext: step.error,
         } as CircuitBreakerOptions);
         this.emitProgress(step, 0, 'Needs user decision');
+
+        // Emit needs user event to Status Agent
+        schedulerEvents.needsUser(step.id, ['retry', 'skip', 'stop']);
       } else {
         // Will retry
         step.status = 'failed';
         step.endedAt = new Date();
         this.emit('step-failed', step);
         this.emitProgress(step, 0, `Failed (attempt ${step.retryCount}/${MAX_RETRIES})`);
+
+        // Emit step failed event to Status Agent
+        schedulerEvents.stepFailed(step.id, step.action, step.error || 'Unknown error', step.retryCount);
 
         // Exponential backoff delay
         const delay = RETRY_BASE_DELAY_MS * Math.pow(2, step.retryCount - 1);

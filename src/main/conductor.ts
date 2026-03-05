@@ -18,6 +18,7 @@ import * as os from 'os';
 import * as path from 'path';
 import * as fs from 'fs';
 import { getStateManager, StateManager } from './state-manager';
+import { conductorEvents } from './events';
 
 // ============================================================================
 // TYPES
@@ -402,6 +403,7 @@ export class Conductor extends EventEmitter {
           if (resumed) {
             console.log('[Conductor] Resumed existing session');
             this.emit('session-resumed', this.sessionId);
+            conductorEvents.sessionStart(this.sessionId, true);
             return;
           }
           // Session invalid, create new one
@@ -524,6 +526,7 @@ export class Conductor extends EventEmitter {
           this.saveSessionId();
           console.log('[Conductor] Created new session:', threadId);
           this.emit('session-started', threadId);
+          conductorEvents.sessionStart(threadId, false);
           resolve();
         } else {
           const error = new Error(`Failed to create session (code: ${code})`);
@@ -577,6 +580,9 @@ export class Conductor extends EventEmitter {
     if (!this.sessionId) {
       await this.initialize();
     }
+
+    // Emit classification start event
+    conductorEvents.classifyStart(message);
 
     return new Promise((resolve, reject) => {
       // Build the classification prompt
@@ -650,6 +656,8 @@ export class Conductor extends EventEmitter {
           const plan = parseExecutionPlan(responseText);
           if (plan) {
             this.emit('classification-complete', plan);
+            conductorEvents.classifyComplete(`plan_${Date.now()}`, plan.plan.length);
+            conductorEvents.planReady(`plan_${Date.now()}`, `${plan.complexity} task with ${plan.plan.length} steps`);
             resolve(plan);
           } else {
             // Fallback: create a simple web route
@@ -672,12 +680,14 @@ export class Conductor extends EventEmitter {
         } else {
           const error = new Error(`Classification failed (code: ${code})`);
           this.emit('error', error);
+          conductorEvents.error(error.message);
           reject(error);
         }
       });
 
       proc.on('error', (err: Error) => {
         this.emit('error', err);
+        conductorEvents.error(err.message);
         reject(err);
       });
 
@@ -718,6 +728,9 @@ export class Conductor extends EventEmitter {
     if (status !== 'failed') {
       return null;
     }
+
+    // Emit replan event
+    conductorEvents.replan(detail || 'Step failed', stepId);
 
     const sessionId = this.sessionId; // Capture for closure
 

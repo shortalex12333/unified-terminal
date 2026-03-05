@@ -4,10 +4,81 @@
  */
 
 // ============================================================================
+// STATUS AGENT TYPES (declare globally before use)
+// ============================================================================
+
+declare type StatusAgentState = 'pending' | 'active' | 'done' | 'error' | 'paused' | 'waiting_user';
+
+declare interface StatusAgentLine {
+  id: string;
+  text: string;
+  expandable: boolean;
+  expandedText: string | null;
+  state: StatusAgentState;
+  stepId: number | null;
+  parentId: string | null;
+  progress: number | null;
+  icon: string;
+}
+
+declare interface StatusAgentLineUpdate {
+  id: string;
+  text?: string;
+  state?: StatusAgentState;
+  progress?: number | null;
+  expandable?: boolean;
+  expandedText?: string | null;
+  icon?: string;
+}
+
+declare interface StatusAgentTreeNode {
+  id: string;
+  parentId: string | null;
+  label: string;
+  state: StatusAgentState;
+  progress: number | null;
+  expandable: boolean;
+  expanded: boolean;
+  children: string[];
+  stepId: number | null;
+  agentId: string | null;
+  output: { type: string; label: string; value: string } | null;
+}
+
+declare interface StatusAgentQueryOption {
+  label: string;
+  value: string;
+  detail: string | null;
+  icon: string | null;
+}
+
+declare interface StatusAgentQuery {
+  id: string;
+  source: string;
+  stepId: number | null;
+  agentHandle: string;
+  type: 'choice' | 'text' | 'confirm' | 'upload';
+  question: string;
+  options: StatusAgentQueryOption[];
+  placeholder: string | null;
+  defaultChoice: string | null;
+  timeout: number;
+  priority: 'normal' | 'blocking';
+}
+
+declare interface StatusAgentFuel {
+  percent: number;
+  label: string;
+  detail: string;
+  warning: boolean;
+  warningText: string | null;
+}
+
+// ============================================================================
 // CLI PROVIDER TYPES
 // ============================================================================
 
-interface ProviderStatus {
+declare interface ProviderStatus {
   tool: string;
   isInstalled: boolean;
   isAuthenticated: boolean;
@@ -15,7 +86,7 @@ interface ProviderStatus {
   error?: string;
 }
 
-interface CLIOutputData {
+declare interface CLIOutputData {
   provider: string;
   chunk: string;
   done: boolean;
@@ -23,23 +94,23 @@ interface CLIOutputData {
   error?: string;
 }
 
-interface CLIAuthOutput {
+declare interface CLIAuthOutput {
   provider: string;
   output: string;
 }
 
-interface CLIInstallProgress {
+declare interface CLIInstallProgress {
   provider: string;
   status: 'installing' | 'complete' | 'error';
   message: string;
 }
 
-interface CLIOutputChunk {
+declare interface CLIOutputChunk {
   processId: string;
   chunk: string;
 }
 
-interface CLIProcessExit {
+declare interface CLIProcessExit {
   processId: string;
   exitCode: number;
 }
@@ -48,7 +119,7 @@ interface CLIProcessExit {
 // LEGACY AUTH TYPES (for backward compatibility)
 // ============================================================================
 
-interface AuthStatus {
+declare interface AuthStatus {
   tool: string;
   isAuthenticated: boolean;
   lastChecked: number;
@@ -56,7 +127,7 @@ interface AuthStatus {
   error?: string;
 }
 
-interface AuthProgress {
+declare interface AuthProgress {
   tool: string;
   status: 'checking' | 'auth-required' | 'authenticating' | 'authenticated' | 'failed';
   message: string;
@@ -67,7 +138,7 @@ interface AuthProgress {
 // WINDOW API INTERFACE
 // ============================================================================
 
-interface ElectronAPI {
+declare interface ElectronAPI {
   // Platform info
   platform: NodeJS.Platform;
 
@@ -140,6 +211,90 @@ interface ElectronAPI {
   // Shell methods (open external URLs in system browser)
   shell?: {
     openExternal: (url: string) => Promise<{ success: boolean; error?: string }>;
+  };
+
+  // Status Agent methods (progress tree, queries, fuel gauge)
+  statusAgent?: {
+    // ─────────────────────────────────────────────────────────────────────
+    // Event Listeners (returns cleanup function)
+    // ─────────────────────────────────────────────────────────────────────
+
+    /** New status line added to tree */
+    onStatusLine: (callback: (line: StatusAgentLine) => void) => () => void;
+
+    /** Partial update to existing status line */
+    onStatusLineUpdate: (callback: (data: StatusAgentLineUpdate) => void) => () => void;
+
+    /** Batch of new status lines */
+    onStatusLineBatch: (callback: (lines: StatusAgentLine[]) => void) => () => void;
+
+    /** Batch of partial updates */
+    onStatusLineUpdateBatch: (callback: (updates: StatusAgentLineUpdate[]) => void) => () => void;
+
+    /** Tree node update */
+    onTreeNode: (callback: (node: StatusAgentTreeNode) => void) => () => void;
+
+    /** User query requiring input */
+    onQuery: (callback: (query: StatusAgentQuery) => void) => () => void;
+
+    /** Query timed out, default value used */
+    onQueryTimeout: (callback: (data: { queryId: string; defaultValue: string }) => void) => () => void;
+
+    /** Fuel gauge update */
+    onFuelUpdate: (callback: (fuel: StatusAgentFuel) => void) => () => void;
+
+    /** Build started notification */
+    onBuildStarted: (callback: (data: { projectName: string; tier: number; estimatedTime: string }) => void) => () => void;
+
+    /** Build complete notification */
+    onBuildComplete: (callback: (data: { outputs: Array<{ type: string; label: string; value: string }> }) => void) => () => void;
+
+    /** Interrupt acknowledgement */
+    onInterruptAck: (callback: (detail: { affected: string[]; unaffected: string[]; message: string }) => void) => () => void;
+
+    /** Shell state change */
+    onShellState: (callback: (state: 'idle' | 'building' | 'minimised' | 'complete') => void) => () => void;
+
+    /** Error notification */
+    onError: (callback: (error: { id: string; message: string; stepId?: number; recoverable: boolean }) => void) => () => void;
+
+    /** Error recovered notification */
+    onErrorRecovered: (callback: (data: { errorId: string; resolution: string }) => void) => () => void;
+
+    // ─────────────────────────────────────────────────────────────────────
+    // User Actions (send to main process)
+    // ─────────────────────────────────────────────────────────────────────
+
+    /** Send response to a user query */
+    sendQueryResponse: (queryId: string, value: string) => void;
+
+    /** Send user correction/feedback */
+    sendCorrection: (text: string) => void;
+
+    /** Request to stop a specific step */
+    sendStopStep: (stepId: number) => void;
+
+    /** Request to stop all running steps */
+    sendStopAll: () => void;
+
+    /** Request to pause the build */
+    sendPause: () => void;
+
+    /** Request to resume the build */
+    sendResume: () => void;
+
+    // ─────────────────────────────────────────────────────────────────────
+    // Tree Visibility Controls
+    // ─────────────────────────────────────────────────────────────────────
+
+    /** Hide the progress tree (minimize) */
+    hideTree: () => void;
+
+    /** Expand/show the progress tree */
+    expandTree: () => void;
+
+    /** Dismiss the tree (mark complete, return to idle) */
+    dismissTree: () => void;
   };
 }
 

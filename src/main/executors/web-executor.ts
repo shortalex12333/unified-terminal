@@ -13,6 +13,7 @@ import * as https from 'https';
 import * as http from 'http';
 import { URL } from 'url';
 import { CHATGPT_SELECTORS, INJECTION_CONFIG, CAPTURE_CONFIG } from '../../utils/dom-selectors';
+import { imageGenEvents } from '../events';
 
 // ============================================================================
 // TYPES
@@ -184,6 +185,11 @@ export class WebExecutor implements Executor {
       // Get current message count before sending
       this.lastMessageCount = await this.getMessageCount();
 
+      // Emit image generation start event for DALL-E actions
+      if (step.action === 'dall_e') {
+        imageGenEvents.start(step.prompt);
+      }
+
       // Inject the prompt
       const injectionResult = await this.injectMessage(step.prompt);
       if (!injectionResult.success) {
@@ -233,6 +239,10 @@ export class WebExecutor implements Executor {
         const imageUrls = await this.extractImageUrls();
         if (imageUrls.length > 0) {
           images = await this.downloadImages(imageUrls, step.projectDir);
+          // Emit completion with first image path
+          if (images.length > 0) {
+            imageGenEvents.complete(images[0]);
+          }
         }
       }
 
@@ -246,6 +256,11 @@ export class WebExecutor implements Executor {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       console.error(`[WebExecutor] Error executing step ${step.id}:`, errorMessage);
+
+      // Emit image generation error for DALL-E actions
+      if (step.action === 'dall_e') {
+        imageGenEvents.error(errorMessage);
+      }
 
       // Determine error type
       let errorType: WebResult['errorType'] = 'unknown';
