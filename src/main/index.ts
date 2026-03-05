@@ -162,6 +162,9 @@ import {
 import { getRateLimitRecovery, cleanupRateLimitRecovery } from './rate-limit-recovery';
 import { installInterceptor, setupInterceptorIPC } from './send-interceptor';
 
+// Status Agent (User-facing translation layer)
+import { initializeStatusAgent, cleanupStatusAgent } from '../status-agent';
+
 // Executors (Phase 2: Wire into step-scheduler)
 import { getCLIExecutor, cleanupCLIExecutor as cleanupCLIExec } from './executors/cli-executor';
 import { createWebExecutor } from './executors/web-executor';
@@ -804,6 +807,12 @@ app.whenReady().then(() => {
     console.error('[App] Conductor initialization failed:', err);
   });
 
+  // Initialize Status Agent (User-facing translation layer)
+  if (mainWindow) {
+    initializeStatusAgent(mainWindow);
+    console.log('[App] Status Agent initialized');
+  }
+
   // Initialize Rate Limit Recovery (check for deferred work from previous session)
   const rateLimitRecovery = getRateLimitRecovery();
   // Note: Full scheduler integration happens when a plan is executed
@@ -898,6 +907,7 @@ app.on('will-quit', async () => {
   cleanupCLIRunner();
   cleanupCodexAdapter();
   cleanupErrorHandler();
+  cleanupStatusAgent();
   await cleanupFileWatcher();
 });
 
