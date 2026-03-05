@@ -1,0 +1,14 @@
+# Dependencies and build output
+node_modules/
+dist/
+.vite/
+
+# Logs and OS files
+npm-debug.log*
+yarn-error.log
+.DS_Store
+
+# Env/Secrets
+.env
+.env.*
+.vercel/
