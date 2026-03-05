@@ -1,0 +1,54 @@
+@font-face {
+  font-family: 'Bumbbled';
+  src: url('/fonts/Bumbbled.otf') format('opentype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Eloquia Display';
+  src: url('/fonts/Eloquia-Display-Light.otf') format('opentype');
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Poppins';
+  src: url('/fonts/Poppins-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Poppins';
+  src: url('/fonts/Poppins-Medium.ttf') format('truetype');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+.font-bumbled {
+  font-family: 'Bumbbled', cursive;
+}
+
+.font-eloquia {
+  font-family: 'Eloquia Display', serif;
+  font-weight: 300;
+}
+
+.font-poppins {
+  font-family: 'Poppins', sans-serif;
+  font-weight: 400;
+}
+
+/* Brand gradient text for the Kenoki logotype */
+.text-gradient-logo {
+  background: linear-gradient(135deg, #e6c3df, #fcc5cb);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
