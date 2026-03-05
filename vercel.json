@@ -1,26 +1,10 @@
 {
   "version": 2,
   "builds": [
-    {
-      "src": "KENOKI_LANDING_PAGE/package.json",
-      "use": "@vercel/static-build",
-      "config": {
-        "distDir": "dist"
-      }
-    },
-    {
-      "src": "KENOKI_LANDING_PAGE/api/**/*.js",
-      "use": "@vercel/node"
-    }
+    { "src": "KENOKI_LANDING_PAGE/package.json", "use": "@vercel/static-build", "config": { "distDir": "dist" } },
+    { "src": "KENOKI_LANDING_PAGE/api/**/*.js", "use": "@vercel/node" }
   ],
   "routes": [
-    {
-      "src": "/api/(.*)",
-      "dest": "KENOKI_LANDING_PAGE/api/$1.js"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "KENOKI_LANDING_PAGE/dist/$1"
-    }
+    { "src": "/api/(.*)", "dest": "KENOKI_LANDING_PAGE/api/$1.js" }
   ]
 }
