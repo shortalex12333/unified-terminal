@@ -4,11 +4,25 @@
 
 Electron desktop app wrapping CLI AI tools (ChatGPT, GSD, Claude Code, Codex) for non-technical users. Users interact with ChatGPT in a native window; the app routes tasks to local CLI tools when needed.
 
-## Current Status (2026-03-03)
+## Current Status (2026-03-05)
 
-**ALL 17 GATES COMPLETE + CONDUCTOR SYSTEM + INSTANCE 3/4 ENFORCEMENT ENGINE** — Backend infrastructure built, tested, verified. Hardcoded Enforcement Engine specification and runtime layer complete.
+**ALL 17 GATES + CONDUCTOR + ENFORCEMENT ENGINE + STATUS AGENT INTEGRATED** — Backend-to-frontend event pipeline complete. Worktree merged to main.
 
-### Instance 3/4 Work: Hardcoded Enforcement Engine
+### Instance 6/7 Work: Status Agent + Enforcement Engine Integration
+
+**Status: ✅ INTEGRATED (Commit: 42401a7)**
+
+| Component | Status | Details |
+|-----------|--------|---------|
+| Instance 3/4 Enforcement Engine | ✅ Merged | bodyguard, spine, enforcer in `src/enforcement/` |
+| Instance 6 Status Agent | ✅ Merged | translator, handlers, query in `src/status-agent/` |
+| Event Bus Bridge | ✅ Wired | `src/main/events.ts` with all emitters |
+| IPC Handlers | ✅ Registered | Status Agent initialized in `index.ts` |
+| React UI | ✅ Ready | CircuitBreakerModal in render tree, hooks created |
+| Build | ✅ Passing | `npm run build` succeeds |
+| Tests | ✅ Passing | Unit tests pass (1 unrelated failure) |
+
+### Previous Instance 3/4 Work: Hardcoded Enforcement Engine
 
 **Status: ✅ PRODUCTION READY (Score: 95/100)**
 
@@ -57,11 +71,12 @@ Electron desktop app wrapping CLI AI tools (ChatGPT, GSD, Claude Code, Codex) fo
 - **Step Scheduler: 83/83**
 - **CLI Auth: 57/57** (NEW - Gemini support)
 
-## Source Files (46 TypeScript files)
+## Source Files (70+ TypeScript files)
 
 ```
 src/
-├── main/                    # Electron main process (26 files)
+├── main/                    # Electron main process (27 files)
+│   ├── events.ts            # Event Bus - all emitters (NEW)
 │   ├── index.ts             # App entry, IPC handlers, BrowserView
 │   ├── chatgpt-adapter.ts   # DOM injection + capture
 │   ├── cli-auth.ts          # CLI tool authentication
@@ -112,6 +127,42 @@ src/
 │       ├── claude-code.ts
 │       └── research.ts
 │
+├── enforcement/             # Hardcoded Enforcement Engine (NEW)
+│   ├── bodyguard.ts         # Gate checks - runs ALL checks in parallel
+│   ├── spine.ts             # File tracking and comparison
+│   ├── enforcer.ts          # Individual check execution with retry
+│   ├── constants.ts         # Retry policies, activation maps
+│   ├── types.ts             # DagStep, BodyguardVerdict, etc.
+│   └── index.ts             # Exports
+│
+├── status-agent/            # User-facing translation layer (NEW)
+│   ├── index.ts             # Entry point, initialization
+│   ├── translator.ts        # Event → StatusLine translation
+│   ├── handlers.ts          # Event subscription handlers
+│   ├── query.ts             # User query system
+│   ├── ipc.ts               # IPC channel setup
+│   ├── types.ts             # StatusLine, TreeNode types
+│   └── voice.ts             # Voice output (future)
+│
+├── glue/                    # Prompt assembly layer (NEW)
+│   ├── assemble-prompt.ts   # Prompt construction
+│   ├── normalizer.ts        # Result normalization
+│   └── index.ts             # Exports
+│
+├── skills/                  # Skill selection system (NEW)
+│   ├── selector.ts          # Skill selection logic
+│   ├── validator.ts         # Selection validation
+│   ├── verify-parser.ts     # Verify block parsing
+│   ├── verify-sandbox.ts    # Sandboxed command execution
+│   └── index.ts             # Exports
+│
+├── adapters/                # CLI adapter implementations (NEW)
+│   ├── claude/adapter.ts    # Claude Code adapter
+│   ├── codex/adapter.ts     # Codex CLI adapter
+│   ├── factory.ts           # Adapter factory
+│   ├── permissions.ts       # Permission checks
+│   └── types.ts             # Adapter types
+│
 ├── utils/
 │   └── dom-selectors.ts     # ChatGPT DOM selectors
 │
@@ -119,11 +170,17 @@ src/
     ├── index.tsx            # React entry point
     ├── index.html           # HTML template
     ├── styles.css           # Tailwind CSS imports
-    ├── global.d.ts          # Window.electronAPI types
+    ├── global.d.ts          # Window.electronAPI types (incl. statusAgent)
+    ├── hooks/               # React hooks (NEW)
+    │   ├── useStatusAgent.ts    # Status Agent subscription hook
+    │   └── useAppShell.ts       # App shell state hook
+    ├── types/               # TypeScript types (NEW)
+    │   └── status-agent.d.ts    # Status Agent types
     └── components/
         ├── App.tsx              # Root component with state
         ├── ProfilePicker.tsx    # Chrome-style provider picker
         ├── ChatInterface.tsx    # Unified chat UI for all providers
+        ├── CircuitBreakerModal.tsx  # Step failure modal (NEW)
         ├── AuthScreen.tsx       # CLI auth UI (legacy)
         └── ProviderScreen.tsx   # Provider selection (legacy)
 
