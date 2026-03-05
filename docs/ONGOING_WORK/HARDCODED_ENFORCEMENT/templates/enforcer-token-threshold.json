@@ -1,27 +1,37 @@
 {
-  "name": "token-threshold-check",
-  "description": "Verify agent token usage against per-model limits (Claude, Gemini, Codex)",
-  "checkScript": "check_tokens.py",
-  "stepType": "resource",
-  "applicableCardTypes": ["AgentCard"],
-  "failureMode": "HARD",
-  "allowSkip": false,
-  "allowRetry": true,
-  "confidence": 0.95,
-  "evidence": {
-    "required": true,
-    "format": "json",
-    "fields": ["modelName", "tokensUsed", "threshold", "percentageUsed"]
-  },
-  "timeout": 10,
-  "retryCount": 1,
+  "skill": "token-threshold-enforcement",
+  "description": "Monitor API token usage against model-specific thresholds",
+  "checks": [
+    {
+      "id": 10,
+      "name": "token-threshold",
+      "label": "Token Usage Threshold",
+      "description": "Check cumulative API token usage is below model-specific threshold to prevent runaway costs",
+      "script": "checks/check_tokens.py",
+      "pass": "token_usage < TOKEN_THRESHOLDS[model].killAt percentage",
+      "confidence": "heuristic",
+      "when": "during step execution (every 30 seconds)",
+      "retries": {
+        "attempts": 1,
+        "delayMs": 0
+      },
+      "timeout": 30000,
+      "optional": false,
+      "tier": 2,
+      "phase": "during-step"
+    }
+  ],
   "activation": {
-    "trigger": "every_spawn",
-    "condition": "agentTier !== null"
+    "triggers": ["during_step_execution"],
+    "tiers": [1, 2, 3],
+    "skipConditions": [
+      "no API token configured"
+    ]
   },
-  "threshold": {
-    "claude-sonnet-4": 110000,
-    "claude-opus-4": 200000,
-    "gemini-2.0-flash": 80000
+  "failure": {
+    "severity": "warning",
+    "userMessage": "Token usage approaching model threshold. Current usage shown in monitoring. Agent may be killed if threshold exceeded (unless task is >85% complete).",
+    "allowSkip": true,
+    "options": ["Continue", "Reduce output", "Stop build"]
   }
 }

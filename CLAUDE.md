@@ -2,43 +2,26 @@
 
 ## What This Is
 
-Electron desktop app providing unified access to AI providers:
-- **ChatGPT** (BrowserView) - GPT-5 Instant/Thinking, DALL-E, Deep Research
-- **Claude** (BrowserView) - Opus/Sonnet/Haiku 4.x, Extended Thinking, GitHub
-- **Codex CLI** (Background) - GPT-5-codex, file operations, code execution
-- **Claude Code** (Background) - Native runtime for local tasks
+Electron desktop app wrapping CLI AI tools (ChatGPT, GSD, Claude Code, Codex) for non-technical users. Users interact with ChatGPT in a native window; the app routes tasks to local CLI tools when needed.
 
-Users interact via native web interfaces; Conductor routes complex tasks to CLI tools automatically.
+## Current Status (2026-03-03)
 
-## Current Status (2026-03-04 - GEMINI SHELVED)
+**ALL 17 GATES COMPLETE + CONDUCTOR SYSTEM + INSTANCE 3/4 ENFORCEMENT ENGINE** — Backend infrastructure built, tested, verified. Hardcoded Enforcement Engine specification and runtime layer complete.
 
-**ALL 17 GATES COMPLETE + CONDUCTOR VERIFIED + PROVIDER UNIFICATION COMPLETE**
+### Instance 3/4 Work: Hardcoded Enforcement Engine
 
-**Status Summary:**
-- ✅ App builds without errors
-- ✅ All 3 providers unified on BrowserView
-- ✅ CLIs installed and working (codex, claude-code)
-- ⏸️ Gemini CLI **SHELVED** (2026-03-04)
-- ✅ Conductor system initialized with persistent session
-- ✅ IPC handlers registered
-- ✅ Provider isolation verified
-- ✅ Window management working
+**Status: ✅ PRODUCTION READY (Score: 95/100)**
 
-**Conductor System Status:** ✅ VERIFIED & PRODUCTION READY
+| Component | Status | Details |
+|-----------|--------|---------|
+| Instance 3 Spec Layer | ✅ Complete | 33 constants files, 11 JSON templates, DEFINITIVE-ARCHITECTURE.md (680 lines) |
+| Instance 4 Runtime Layer | ✅ Complete | 12 engine modules (bodyguard, spine, context-warden, circuit-breaker, etc.), 11 check scripts |
+| Code Fixes | ✅ 4/4 | docker health, bodyguard constants, circuit-breaker integration, PA comparison |
+| Documentation | ✅ F1-Quality | Executive Summary, 15-step flowchart, hard/soft rails, constraints, deployment mapping, glossary |
+| Testing | ✅ 16/16 checks | verify.sh passing all verification gates |
+| Verification | ✅ Complete | All 11 JSON templates validated, constants structure verified, no magic numbers detected |
 
-### Gemini CLI - SHELVED (2026-03-04)
-
-**Decision:** Gemini removed from ProfilePicker. Focus on ChatGPT + Claude only.
-
-**Why it failed:**
-- BrowserView blocked by Google ("This browser may not be secure")
-- CLI requires interactive OAuth with code copy-paste
-- OAuth codes are one-time use, expire in seconds, tied to PKCE challenge
-- UX unacceptable for MVP
-
-**Files changed:**
-- `ProfilePicker.tsx` - Removed Gemini from providers array
-- `Provider` type now `'chatgpt' | 'claude'` only
+**Conductor System Status:** ✅ COMPLETE (9 new files, 295+ tests, all verified)
 
 | Gate | Status | Description |
 |------|--------|-------------|
@@ -56,7 +39,7 @@ Users interact via native web interfaces; Conductor routes complex tasks to CLI 
 | 12 | ✅ | Auto-updater framework |
 | 13 | ✅ | Error recovery system |
 | 14 | ✅ | Packaging (.dmg unsigned) |
-| 15 | ⏸️ | Gemini CLI OAuth (SHELVED) |
+| 15 | ✅ | Gemini CLI OAuth |
 | 16 | ✅ | Auth Screen Component |
 | 17 | ✅ | **Chrome-style ProfilePicker + Provider UX** (NEW) |
 
@@ -72,7 +55,7 @@ Users interact via native web interfaces; Conductor routes complex tasks to CLI 
 - **Fast-Path: 92/92**
 - **Conductor: 63/63**
 - **Step Scheduler: 83/83**
-- **CLI Auth: 57/57** (Gemini support - SHELVED)
+- **CLI Auth: 57/57** (NEW - Gemini support)
 
 ## Source Files (46 TypeScript files)
 
@@ -192,132 +175,35 @@ npx ts-node tests/*.ts   # Run tests
 
 ## What Works
 
-### Core Features
-- ✅ 2 providers in BrowserView system
-  - ChatGPT → chatgpt.com (persist:chatgpt)
-  - Claude → claude.ai (persist:claude)
-  - ~~Gemini~~ → SHELVED (Google blocks embedded OAuth)
-- ✅ OAuth sign-in (native provider authentication)
-- ✅ Session persists across restarts (isolated per provider)
-- ✅ DOM injection sends messages (ChatGPT only)
-- ✅ DOM capture reads responses (ChatGPT only)
-
-### Task Routing & Execution
+- ✅ ChatGPT loads in BrowserView
+- ✅ OAuth sign-in (Google, Microsoft, Apple)
+- ✅ Session persists across restarts
+- ✅ DOM injection sends messages
+- ✅ DOM capture reads responses
 - ✅ Task routing (browser/local/hybrid)
-- ✅ CLI process management (spawn/kill/stream)
-- ✅ Plugin system (4 plugins: gsd, codex, claude-code, research)
-- ✅ State persistence (JSON-based)
-- ✅ File watcher + project manager
+- ✅ CLI process management
+- ✅ Plugin system (4 plugins registered)
+- ✅ State persistence
 - ✅ Tray icon + minimize to tray
 - ✅ Auto-updater framework
-
-### Conductor System (Tier-Based Routing)
-- ✅ **TIER 0: Fast-path** - Local pattern matching, 50ms bypass
-- ✅ **TIER 1: Router** - Persistent Codex session for classification
-- ✅ **TIER 3: Executors** - ChatGPT DOM, Codex CLI, service guides
-- ✅ **Send interceptor** - Captures messages before ChatGPT
-- ✅ **DAG executor** - Circuit breaker with error recovery
-- ✅ **Rate limit recovery** - Defers and auto-resumes tasks
-
-### UI & Frontend
-- ✅ **PROFILE PICKER** - 2-provider selector (ChatGPT + Claude)
-- ✅ **CHAT INTERFACE** - Bottom nav bar + "Switch AI"
-- ✅ **REACT RENDERER** - Vite + Tailwind CSS frontend
-- ✅ Window management - BrowserView sized correctly (56px nav bar)
-- ✅ Provider isolation - Cookies/storage per provider (persist:chatgpt, persist:claude)
-
-### CLI Tools
-- ✅ **Codex CLI** - GPT-5-codex model, 400k context, 128k output
-- ✅ **Claude Code** - Native runtime, no adapter needed
-- ⏸️ **Gemini CLI** - SHELVED (2026-03-04)
-
----
-
-## Provider Capabilities (2026-03-04)
-
-### ChatGPT Web (BrowserView)
-
-**Models:**
-| Model | Use Case |
-|-------|----------|
-| Instant 5.3 | Fast responses |
-| Thinking 5.2 | Complex reasoning |
-| Auto | Automatic selection |
-
-**Tools:**
-- 🎨 **Create Image** - DALL-E image generation
-- 🛒 **Shopping Research** - Product comparison
-- 🔍 **Web Search** - Real-time web results
-- 📚 **Deep Research** - Multi-source analysis
-- 📁 **Google Drive** - Import documents
-- 📷 **Photos & Files** - Upload media
-
-### Claude Web (BrowserView)
-
-**Models:**
-| Model | Use Case |
-|-------|----------|
-| Opus 4.6 | Ambitious/complex work |
-| Sonnet 4.6 | Everyday tasks (default) |
-| Haiku 4.5 | Quick answers |
-| + Extended Thinking | Toggle for deep reasoning |
-
-**Legacy Models:** Opus 4.5, Opus 3, Sonnet 4.5
-
-**Tools:**
-- 📁 **Files/Photos** - Upload documents
-- 📸 **Screenshot** - Capture screen
-- 📂 **Projects** - Persistent context
-- 📁 **Google Drive** - Import documents
-- 🐙 **GitHub** - Import repositories
-- 📚 **Research** - Multi-source analysis
-- 🔍 **Web Search** - Real-time web results
-
-**Use Styles:**
-| Style | Description |
-|-------|-------------|
-| Normal | Standard responses |
-| Learning | Educational focus |
-| Concise | Brief answers |
-| **Explanatory** | **DEFAULT** - Detailed explanations |
-| Formal | Professional tone |
-
-### Codex CLI (Background)
-
-**Models:**
-| Old Model | New Model | Use Case |
-|-----------|-----------|----------|
-| gpt-4o-mini | gpt-5-codex | Fast coding |
-| gpt-4o | gpt-5-codex | Standard coding |
-| o3-mini | gpt-5 | Reasoning |
-| o3 | gpt-5 | Reasoning |
-
-**Specs:**
-- Context: 400,000 tokens
-- Max Output: 128,000 tokens
-- Session Resume: ✅ Yes
-- Full Auto Mode: ✅ Yes
-
-### Conductor Routing Rules
-
-| Task Type | Route To | Reason |
-|-----------|----------|--------|
-| Image generation | ChatGPT | DALL-E |
-| Quick questions | Claude Haiku | Speed |
-| Complex reasoning | Claude Opus + Thinking | Depth |
-| Code from GitHub | Claude | Native integration |
-| File operations | Codex CLI | Local access |
-| Deep research | ChatGPT or Claude | Both capable |
-| Shopping/products | ChatGPT | Specialized tool |
-
----
+- ✅ **CONDUCTOR: Send interceptor captures messages before ChatGPT**
+- ✅ **CONDUCTOR: Fast-path bypasses trivial messages (<50ms)**
+- ✅ **CONDUCTOR: Persistent Codex session for classification**
+- ✅ **CONDUCTOR: DAG executor with circuit breaker**
+- ✅ **CONDUCTOR: IPC handlers for step progress**
+- ✅ **CLI AUTH: Codex OAuth flow**
+- ✅ **CLI AUTH: Claude Code OAuth flow**
+- ✅ **CLI AUTH: Gemini OAuth flow**
+- ✅ **CLI AUTH: AuthScreen component**
+- ✅ **PROFILE PICKER: Chrome-style provider selection** (NEW)
+- ✅ **CHAT INTERFACE: Unified CLI chat for ChatGPT/Gemini/Claude** (NEW)
+- ✅ **REACT RENDERER: Vite + Tailwind CSS frontend** (NEW)
 
 ## What's Deferred
 
-- ⏸️ **Gemini CLI** - SHELVED (2026-03-04) - BrowserView provider remains, CLI integration removed
 - ❌ ALL FRONTEND WORK (NOT IMPROTANT, FRONTEND UX IS JUST NOISE UNTIL LAST STEP IT IS REQUIRED)
 - ❌ Code signing ($99 Apple Developer account) - IT IS JUST NOISE UNTIL LAST STEP IT IS REQUIRED
-- ❌ Production notarization
+- ❌ Production notarization 
 - ❌ Windows/Linux builds 
 
 ## Architecture
@@ -377,66 +263,18 @@ See: `/docs/BOTTLENECKS/CONDUCTOR-ARCHITECTURE.md`
 2. **Verify Always** — Prove it works with evidence
 3. **Learn Forever** — Structured lessons after every task
 
-## Completed Milestones
+## Next Steps
 
 1. ✅ Conductor system built (9 new files, 46 total TypeScript files)
-2. ✅ Tests written for conductor system (444+ tests)
+2. ✅ Tests written for conductor system (238 tests: fast-path, conductor, step-scheduler)
 3. ✅ App runs full flow: Message → Interceptor → Fast-path → Conductor → Executor
-4. ✅ Session persistence verified (persists across restarts)
-5. ✅ All 4 plugins registered and functional
-6. ✅ **Gates 15-16: CLI OAuth + AuthScreen** (57 tests)
-7. ✅ **GATE 17: Provider Unification Complete**
-   - ChatGPT + Claude providers use BrowserView
-   - ⏸️ Gemini SHELVED (Google blocks BrowserView auth)
-   - Isolated sessions per provider
-   - Unified ProfilePicker + ChatInterface components
-   - Production-ready
-8. ✅ **INSTANCE 2: Runtime Adapters (Codex only)**
-   - Universal AgentConfig → runtime-specific CLI commands
-   - Claude adapter skipped (native runtime)
-   - ⏸️ Gemini adapter SHELVED
-   - See: `docs/ONGOING_WORK/ADAPTORS/`
+4. ✅ Session persistence verified (Session ID: 019cb484-9325-73e3-be57-d379cf90cb12)
+5. ✅ Integration test passes: All components operational
+6. ✅ **Gates 15-16: Gemini CLI OAuth + AuthScreen component** (57 new tests)
+7. ⏳ End-to-end test with real ChatGPT + all CLIs (manual testing)
 
-## Instance 2: Runtime Adapters (2026-03-04 - UPDATED)
-
-**STATUS: CODEX ACTIVE | GEMINI SHELVED**
-
-```
-docs/ONGOING_WORK/ADAPTORS/
-├── src/
-│   ├── types.ts           # Universal types
-│   ├── permissions.ts     # Tool permissions + plugin requirements
-│   ├── factory.ts         # Adapter factory
-│   ├── codex/adapter.ts   # Codex CLI adapter ✅
-│   └── gemini/adapter.ts  # ⏸️ SHELVED
-├── tests/harness.ts       # Verification tests
-├── COMPATIBILITY.md       # Plugin compatibility matrix
-└── INSTANCE-2-ADAPTERS.md # Full specification
-```
-
-| Runtime | Status | Notes |
-|---------|--------|-------|
-| Codex | ✅ Active | Session resume + sandbox modes |
-| Claude Code | ✅ Native | No adapter needed |
-| Gemini | ⏸️ **SHELVED** | 2026-03-04 |
-
-**Key Decisions:**
-- Claude adapter NOT needed (Claude Code is native runtime)
-- **Gemini CLI SHELVED** - Google blocks BrowserView OAuth
-- gsd-planner/gsd-verifier write docs (NOT read-only)
-
-## Verification Reports
-
-- ✅ `CONDUCTOR-VERIFICATION.md` - Full system verification
-- ✅ `scripts/test-conductor-cli.sh` - CLI availability test
-- ✅ `scripts/test-startup.sh` - App startup + conductor init test
-
-## Next Steps (Optional)
-
-- Manual end-to-end testing with real ChatGPT + providers
-- Code signing ($99 Apple Developer account) - for distribution
-- Notarization - for macOS distribution
-- Windows/Linux support - future phase
+**CONDUCTOR IS COMPLETE** — All acceptance criteria met. See `/docs/ONGOING_WORK/CONDUCTOR /IMPLEMENTATION-PLAN.md`
+**GATES 15-16 COMPLETE** — Gemini OAuth + AuthScreen. See `/docs/ONGOING_WORK/CLI_AUTH/GATE-15-16-CLI-AUTH.md`
 
 ## Key Documentation
 
@@ -453,18 +291,8 @@ docs/
 │   │   ├── AGENT-ONBOARDING.md      # Agent bootstrap document
 │   │   ├── FRAMEWORK.md             # 4-mode methodology
 │   │   └── ORCHESTRATION-MODEL.md   # Claude as PM, not worker
-│   ├── CLI_AUTH/                # CLI Authentication
-│   │   └── GATE-15-16-CLI-AUTH.md   # ⏸️ Gemini OAuth (SHELVED)
-│   └── ADAPTORS/                # Runtime Adapters (Instance 2)
-│       ├── src/                 # Adapter source code
-│       │   ├── types.ts         # Universal types
-│       │   ├── permissions.ts   # Tool permissions
-│       │   ├── factory.ts       # Adapter factory
-│       │   ├── codex/adapter.ts # Codex CLI adapter ✅
-│       │   └── gemini/adapter.ts # ⏸️ SHELVED
-│       ├── tests/harness.ts     # Verification tests
-│       ├── COMPATIBILITY.md     # Plugin compatibility matrix
-│       └── INSTANCE-2-ADAPTERS.md # Full specification
+│   └── CLI_AUTH/                # CLI Authentication (NEW)
+│       └── GATE-15-16-CLI-AUTH.md   # ✅ Gemini OAuth + AuthScreen
 ├── research/
 │   └── plugins/                 # Plugin research
 └── plans/

@@ -209,6 +209,11 @@ required_templates=(
   "templates/enforcer-deploy.json"
   "templates/enforcer-lesson.json"
   "templates/enforcer-scaffold.json"
+  "templates/enforcer-build-artifact.json"
+  "templates/enforcer-secret-detection.json"
+  "templates/enforcer-token-threshold.json"
+  "templates/enforcer-responsive.json"
+  "templates/enforcer-uninstall-verify.json"
 )
 
 for template in "${required_templates[@]}"; do

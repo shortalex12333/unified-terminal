@@ -10,7 +10,22 @@
 
 import { EventEmitter } from 'events';
 import { ipcMain, BrowserWindow } from 'electron';
+import * as path from 'path';
 import { schedulerEvents } from './events';
+
+// Enforcement Engine (Phase 5: 10-step flow)
+import { gateCheck, buildSpine, compareSpines } from '../enforcement';
+import type { SpineState, DagStep, BodyguardVerdict } from '../enforcement';
+import { CIRCUIT_BREAKER, ENFORCER_RETRY_POLICIES } from '../enforcement/constants';
+
+// Skill System (Phase 3/5: selection + verification)
+import { selectSkills, validateSelection, parseVerifyBlock, getChecksForSkill, executeVerifyCommand, isCommandAllowed } from '../skills';
+import type { SkillSelection } from '../skills';
+
+// Glue Layer (Phase 4/5: prompt assembly + result normalization)
+import { assemblePrompt } from '../glue/assemble-prompt';
+import { normalize } from '../glue/normalizer';
+import type { GateCheckInput } from '../glue/normalizer';
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -66,6 +81,8 @@ export interface RuntimeStep extends PlanStep {
   startedAt?: Date;
   /** When execution ended */
   endedAt?: Date;
+  /** Confidence level of the last failure (definitive checks cannot be skipped) */
+  _lastFailureConfidence?: 'definitive' | 'heuristic';
 }
 
 /**
@@ -165,8 +182,8 @@ export interface Conductor {
 // CONSTANTS
 // ============================================================================
 
-/** Maximum retry attempts before circuit breaker triggers */
-const MAX_RETRIES = 3;
+/** Maximum retry attempts before circuit breaker triggers (sourced from enforcement constants) */
+const MAX_RETRIES = CIRCUIT_BREAKER.MAX_STEP_RETRIES;
 
 /** Delay between retries (exponential backoff base) */
 const RETRY_BASE_DELAY_MS = 1000;
@@ -420,13 +437,26 @@ export class StepScheduler extends EventEmitter {
   // ==========================================================================
 
   /**
-   * Execute a single step.
+   * Execute a single step through the 10-step enforcement flow.
+   *
+   * Flow:
+   *   1. Pre-spine snapshot
+   *   2. Skill selection (keyword fallback, future: agent)
+   *   3. Assemble prompt (targeted skill sections + spine context)
+   *   4. Pre-step bodyguard gate
+   *   5. Execute via adapter/executor
+   *   6. Normalize result (AgentResult → GateCheckInput)
+   *   7. Post-spine snapshot
+   *   8. Post-step bodyguard gate
+   *   9. Skill verification (## verify blocks + CRITICAL_SKILL_CHECKS)
+   *  10. PA comparison (pre vs post spine diff)
    */
   private async executeStep(
     step: RuntimeStep,
     context?: Record<string, any>
   ): Promise<void> {
     console.log(`[StepScheduler] Executing step ${step.id}: ${step.action}`);
+    const projectDir = context?.projectDir || process.cwd();
 
     // Get appropriate executor
     const executor = this.executors.get(step.target);
@@ -458,16 +488,239 @@ export class StepScheduler extends EventEmitter {
     schedulerEvents.stepStart(step.id, step.action, step.detail);
 
     try {
-      // Execute the step
-      const result = await executor.execute(step, context);
+      // ====================================================================
+      // STEP 1: PRE-SPINE SNAPSHOT
+      // ====================================================================
+      this.emitProgress(step, 5, 'Capturing pre-state...');
+      let preSpine: SpineState | null = null;
+      try {
+        preSpine = await buildSpine(projectDir, this.buildDagProgress(step.id));
+      } catch (err) {
+        console.warn(`[StepScheduler] Pre-spine snapshot failed (non-fatal):`, err);
+      }
 
-      // Success
+      // ====================================================================
+      // STEP 2: SKILL SELECTION
+      // ====================================================================
+      this.emitProgress(step, 10, 'Selecting skills...');
+      let skillSelection: SkillSelection = { skills: [], reasoning: 'No skills selected' };
+      const skillsBasePath = path.resolve(__dirname, '../../resources/skills');
+      const catalogPath = path.join(skillsBasePath, 'trigger-map.json');
+
+      try {
+        const stepTier = step.target === 'service' ? 0 : step.target === 'cli' ? 2 : 1;
+        const rawSelection = await selectSkills({
+          stepAction: step.action,
+          stepDetail: step.detail,
+          spineSummary: preSpine?.changesSummary || '',
+          tier: stepTier,
+        }, catalogPath);
+
+        // Validate selection against hard rails
+        const validated = validateSelection(rawSelection, skillsBasePath, stepTier);
+        skillSelection = {
+          skills: validated.skills.map(s => path.join(skillsBasePath, s)),
+          reasoning: rawSelection.reasoning,
+        };
+      } catch (err) {
+        console.warn(`[StepScheduler] Skill selection failed (non-fatal):`, err);
+      }
+
+      // ====================================================================
+      // STEP 3: ASSEMBLE PROMPT
+      // ====================================================================
+      this.emitProgress(step, 15, 'Assembling prompt...');
+      let assembledPrompt: string | null = null;
+      if (skillSelection.skills.length > 0) {
+        try {
+          const parts = assemblePrompt({
+            skills: skillSelection.skills,
+            userInput: step.detail,
+            spineContext: {
+              projectDir,
+              recentChanges: preSpine?.gitStatus?.uncommitted || [],
+              tokenBudget: { used: 0, limit: 400_000 },
+            },
+            mode: 'targeted',
+            highRisk: step.action === 'deploy',
+            multiStep: step.parallel,
+          });
+          assembledPrompt = parts.skillSections + '\n' + parts.spineContext + '\n' + parts.userInput;
+        } catch (err) {
+          console.warn(`[StepScheduler] Prompt assembly failed (non-fatal):`, err);
+        }
+      }
+
+      // ====================================================================
+      // STEP 4: PRE-STEP BODYGUARD GATE
+      // ====================================================================
+      this.emitProgress(step, 20, 'Pre-step gate check...');
+      const dagStep: DagStep = {
+        id: String(step.id),
+        phase: 'execution',
+        task: step.detail,
+        action: mapActionToEnforcement(step.action),
+        worker: step.target === 'service' ? 'hybrid' : step.target,
+        tools: [],
+        declaredFiles: [],
+        modifiedCodeFiles: false,
+        isFrontend: false,
+        tier: step.target === 'service' ? 1 : step.target === 'cli' ? 2 : 1,
+        timeout: 120_000,
+        dependsOn: step.waitFor.map(String),
+      };
+
+      let preGateVerdict: BodyguardVerdict | null = null;
+      try {
+        preGateVerdict = await gateCheck(dagStep, projectDir);
+        if (preGateVerdict.gate.verdict === 'HARD_FAIL') {
+          step._lastFailureConfidence = 'definitive';
+          step.status = 'failed';
+          step.error = `Pre-step gate HARD_FAIL: ${preGateVerdict.gate.reasons.join('; ')}`;
+          step.endedAt = new Date();
+          this.emit('step-failed', step);
+          this.emitProgress(step, 0, 'Blocked by pre-step gate');
+          return;
+        }
+        if (preGateVerdict.gate.verdict === 'SOFT_FAIL') {
+          console.warn(`[StepScheduler] Pre-step soft fails:`, preGateVerdict.gate.reasons);
+        }
+      } catch (err) {
+        console.warn(`[StepScheduler] Pre-step gate check failed (non-fatal):`, err);
+      }
+
+      // ====================================================================
+      // STEP 5: EXECUTE VIA ADAPTER
+      // ====================================================================
+      this.emitProgress(step, 30, 'Executing...');
+      const executionContext = assembledPrompt
+        ? { ...context, assembledPrompt }
+        : context;
+
+      const result = await executor.execute(step, executionContext);
+
+      // ====================================================================
+      // STEP 6: NORMALIZE RESULT
+      // ====================================================================
+      this.emitProgress(step, 70, 'Normalizing result...');
+      let gateInput: GateCheckInput | null = null;
+      try {
+        gateInput = normalize(
+          { id: step.id, target: step.target, action: step.action, detail: step.detail, waitFor: step.waitFor, parallel: step.parallel },
+          {
+            id: String(step.id),
+            status: 'completed',
+            output: typeof result === 'string' ? result : JSON.stringify(result || ''),
+            filesCreated: result?.filesCreated || [],
+            filesModified: result?.filesModified || [],
+            tokensUsed: result?.tokensUsed || { input: 0, output: 0 },
+            duration: Date.now() - (step.startedAt?.getTime() || Date.now()),
+            exitCode: result?.exitCode ?? 0,
+            runtime: 'codex',
+          },
+          projectDir,
+        );
+      } catch (err) {
+        console.warn(`[StepScheduler] Result normalization failed (non-fatal):`, err);
+      }
+
+      // ====================================================================
+      // STEP 7: POST-SPINE SNAPSHOT
+      // ====================================================================
+      this.emitProgress(step, 75, 'Capturing post-state...');
+      let postSpine: SpineState | null = null;
+      try {
+        postSpine = await buildSpine(projectDir, this.buildDagProgress(step.id));
+      } catch (err) {
+        console.warn(`[StepScheduler] Post-spine snapshot failed (non-fatal):`, err);
+      }
+
+      // ====================================================================
+      // STEP 8: POST-STEP BODYGUARD GATE
+      // ====================================================================
+      this.emitProgress(step, 80, 'Post-step gate check...');
+      if (gateInput) {
+        // Update dagStep with actual execution data
+        dagStep.modifiedCodeFiles = gateInput.step.modifiedCodeFiles;
+        dagStep.isFrontend = gateInput.step.isFrontend;
+        dagStep.declaredFiles = gateInput.step.declaredFiles;
+      }
+
+      let postGateVerdict: BodyguardVerdict | null = null;
+      try {
+        postGateVerdict = await gateCheck(dagStep, projectDir);
+        if (postGateVerdict.gate.verdict === 'HARD_FAIL') {
+          step._lastFailureConfidence = 'definitive';
+          step.status = 'failed';
+          step.error = `Post-step gate HARD_FAIL: ${postGateVerdict.gate.reasons.join('; ')}`;
+          step.endedAt = new Date();
+          this.emit('step-failed', step);
+          this.emitProgress(step, 0, 'Blocked by post-step gate');
+          return;
+        }
+        if (postGateVerdict.gate.verdict === 'SOFT_FAIL') {
+          console.warn(`[StepScheduler] Post-step soft fails:`, postGateVerdict.gate.reasons);
+        }
+      } catch (err) {
+        console.warn(`[StepScheduler] Post-step gate check failed (non-fatal):`, err);
+      }
+
+      // ====================================================================
+      // STEP 9: SKILL VERIFICATION (## verify blocks + CRITICAL_SKILL_CHECKS)
+      // ====================================================================
+      this.emitProgress(step, 85, 'Verifying skills...');
+      if (skillSelection.skills.length > 0) {
+        try {
+          const fs = await import('fs');
+          for (const skillPath of skillSelection.skills) {
+            if (!fs.existsSync(skillPath)) continue;
+
+            const content = fs.readFileSync(skillPath, 'utf-8');
+            const skillName = path.basename(skillPath);
+            const checks = getChecksForSkill(skillName, content);
+
+            for (const check of checks) {
+              const allowed = isCommandAllowed(check.check);
+              if (allowed.allowed) {
+                const cmdResult = await executeVerifyCommand(check.check, projectDir);
+                if (cmdResult.exitCode !== 0 && check.rail === 'HARD') {
+                  console.warn(`[StepScheduler] Skill HARD check failed: ${check.name} in ${skillName} (exit ${cmdResult.exitCode})`);
+                }
+              }
+            }
+          }
+        } catch (err) {
+          console.warn(`[StepScheduler] Skill verification failed (non-fatal):`, err);
+        }
+      }
+
+      // ====================================================================
+      // STEP 10: PA COMPARISON (pre vs post spine diff)
+      // ====================================================================
+      this.emitProgress(step, 90, 'Comparing state...');
+      if (preSpine && postSpine) {
+        try {
+          const diff = compareSpines(preSpine, postSpine);
+          console.log(`[StepScheduler] PA diff for step ${step.id}: +${diff.filesAdded.length} -${diff.filesRemoved.length} ~${diff.filesModified.length}`);
+
+          // Attach diff to step result for traceability
+          if (result && typeof result === 'object') {
+            result._spineDiff = diff;
+          }
+        } catch (err) {
+          console.warn(`[StepScheduler] PA comparison failed (non-fatal):`, err);
+        }
+      }
+
+      // ====================================================================
+      // SUCCESS
+      // ====================================================================
       step.status = 'done';
       step.result = result;
       step.endedAt = new Date();
-      step.retryCount = 0; // Reset on success
+      step.retryCount = 0;
 
-      console.log(`[StepScheduler] Step ${step.id} completed successfully`);
+      console.log(`[StepScheduler] Step ${step.id} completed successfully (10-step flow)`);
       this.emit('step-done', step);
       this.emitProgress(step, 100, 'Complete');
 
@@ -482,13 +735,19 @@ export class StepScheduler extends EventEmitter {
       console.error(`[StepScheduler] Step ${step.id} failed (attempt ${step.retryCount}):`, step.error);
 
       if (step.retryCount >= MAX_RETRIES) {
-        // Circuit breaker triggered
+        // Circuit breaker triggered — confidence-aware action filtering
+        const isDefinitive = step._lastFailureConfidence === 'definitive';
+        const actions = isDefinitive
+          ? [...CIRCUIT_BREAKER.DEFINITIVE_FAIL_OPTIONS]
+          : [...CIRCUIT_BREAKER.HEURISTIC_FAIL_OPTIONS];
+        const suggested: UserDecision = isDefinitive ? 'retry' : 'skip';
+
         step.status = 'needs_user';
-        console.log(`[StepScheduler] Circuit breaker triggered for step ${step.id}`);
+        console.log(`[StepScheduler] Circuit breaker triggered for step ${step.id} (confidence: ${isDefinitive ? 'definitive' : 'heuristic'})`);
         this.emit('step-needs-user', {
           step,
-          actions: ['retry', 'skip', 'stop'],
-          suggested: 'skip',
+          actions,
+          suggested,
           errorContext: step.error,
         } as CircuitBreakerOptions);
         this.emitProgress(step, 0, 'Needs user decision');
@@ -524,14 +783,21 @@ export class StepScheduler extends EventEmitter {
    * Ask user for decision on failed step.
    */
   private async askUser(step: RuntimeStep): Promise<UserDecision> {
+    const isDefinitive = step._lastFailureConfidence === 'definitive';
+    const actions = isDefinitive
+      ? [...CIRCUIT_BREAKER.DEFINITIVE_FAIL_OPTIONS]
+      : [...CIRCUIT_BREAKER.HEURISTIC_FAIL_OPTIONS];
+    const suggested: UserDecision = isDefinitive ? 'retry' : 'skip';
+    const defaultOnTimeout: UserDecision = isDefinitive ? 'stop' : 'skip';
+
     const options: CircuitBreakerOptions = {
       step,
-      actions: ['retry', 'skip', 'stop'],
-      suggested: 'skip',
+      actions,
+      suggested,
       errorContext: step.error || 'Unknown error',
     };
 
-    console.log(`[StepScheduler] Asking user for decision on step ${step.id}`);
+    console.log(`[StepScheduler] Asking user for decision on step ${step.id} (definitive: ${isDefinitive})`);
 
     // Emit IPC event
     this.emitIPC('step:needs-user', options);
@@ -543,8 +809,8 @@ export class StepScheduler extends EventEmitter {
       // Timeout after 5 minutes
       setTimeout(() => {
         if (this.userDecisionResolver) {
-          console.log('[StepScheduler] User response timeout, defaulting to skip');
-          this.userDecisionResolver('skip');
+          console.log(`[StepScheduler] User response timeout, defaulting to ${defaultOnTimeout}`);
+          this.userDecisionResolver(defaultOnTimeout);
           this.userDecisionResolver = null;
         }
       }, USER_RESPONSE_TIMEOUT_MS);
@@ -746,6 +1012,24 @@ export class StepScheduler extends EventEmitter {
   // ==========================================================================
 
   /**
+   * Build a dagProgress snapshot from the scheduler's internal step state.
+   * Used to pass real DAG progress to buildSpine() instead of hardcoded zeros.
+   */
+  private buildDagProgress(currentStepId?: number): SpineState["dagProgress"] {
+    const allSteps = Array.from(this.steps.values());
+    const failedSteps = allSteps
+      .filter(s => s.status === 'failed')
+      .map(s => String(s.id));
+
+    return {
+      totalSteps: allSteps.length,
+      completedSteps: allSteps.filter(s => s.status === 'done').length,
+      failedSteps,
+      currentStep: currentStepId !== undefined ? String(currentStepId) : undefined,
+    };
+  }
+
+  /**
    * Sleep for a specified duration.
    */
   private sleep(ms: number): Promise<void> {
@@ -773,6 +1057,26 @@ export class StepScheduler extends EventEmitter {
   getStep(stepId: number): RuntimeStep | undefined {
     return this.steps.get(stepId);
   }
+}
+
+// ============================================================================
+// ENFORCEMENT HELPERS
+// ============================================================================
+
+/**
+ * Map scheduler action strings to enforcement DagStep action types.
+ * Enforcement expects a constrained set; scheduler actions are freeform.
+ */
+function mapActionToEnforcement(
+  action: string
+): 'execute' | 'build' | 'deploy' | 'test' | 'cleanup' | 'verify' {
+  const normalized = action.toLowerCase();
+  if (normalized.includes('build') || normalized.includes('scaffold')) return 'build';
+  if (normalized.includes('deploy')) return 'deploy';
+  if (normalized.includes('test')) return 'test';
+  if (normalized.includes('clean') || normalized.includes('remove')) return 'cleanup';
+  if (normalized.includes('verify') || normalized.includes('check')) return 'verify';
+  return 'execute';
 }
 
 // ============================================================================

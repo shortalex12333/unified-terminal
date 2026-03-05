@@ -1,23 +1,35 @@
 {
-  "name": "uninstall-verify-check",
-  "description": "Verify package uninstallation — confirm node_modules/{pkg} is gone after npm uninstall",
-  "checkScript": "check_uninstall.py",
-  "stepType": "dependency",
-  "applicableCardTypes": ["MaintenanceCard"],
-  "failureMode": "HARD",
-  "allowSkip": false,
-  "allowRetry": true,
-  "confidence": 1.0,
-  "evidence": {
-    "required": true,
-    "format": "json",
-    "fields": ["packageName", "wasRemoved", "nodeModulesPath"]
-  },
-  "timeout": 20,
-  "retryCount": 1,
+  "skill": "uninstall-verification-enforcement",
+  "description": "Verify package is properly removed from node_modules after uninstall",
+  "checks": [
+    {
+      "id": 12,
+      "name": "uninstall-verify",
+      "label": "Uninstall Verification",
+      "description": "Check that package is completely removed from node_modules directory",
+      "script": "checks/check_uninstall.py",
+      "pass": "Package directory no longer exists in node_modules/",
+      "confidence": "definitive",
+      "when": "after npm uninstall command",
+      "retries": {
+        "attempts": 1,
+        "delayMs": 0
+      },
+      "timeout": 10000,
+      "optional": false,
+      "tier": 1,
+      "phase": "post-step"
+    }
+  ],
   "activation": {
-    "trigger": "after_npm_uninstall",
-    "condition": "uninstalledPackages.length > 0"
+    "triggers": ["post_uninstall"],
+    "tiers": [0, 1, 2, 3],
+    "skipConditions": []
   },
-  "packages": []
+  "failure": {
+    "severity": "error",
+    "userMessage": "Package uninstall verification failed. Package still exists in node_modules. Verify npm uninstall ran successfully and node_modules are in consistent state.",
+    "allowSkip": false,
+    "options": ["Retry", "Stop build"]
+  }
 }

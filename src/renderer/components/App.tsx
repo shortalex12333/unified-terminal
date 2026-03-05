@@ -3,6 +3,7 @@ import StartingScreen from './StartingScreen';
 import ProfilePicker, { Provider } from './ProfilePicker';
 import ChatInterface from './ChatInterface';
 import TerminalUI from './TerminalUI';
+import CircuitBreakerModal from './CircuitBreakerModal';
 
 export interface ProviderState {
   provider: Provider;
@@ -63,41 +64,50 @@ export default function App() {
     };
   }, [providerState]);
 
-  // Render based on current screen
-  switch (screen) {
-    case 'starting':
-      return <StartingScreen onBegin={handleBegin} />;
+  // Render content based on current screen
+  const renderContent = () => {
+    switch (screen) {
+      case 'starting':
+        return <StartingScreen onBegin={handleBegin} />;
 
-    case 'select-provider':
-      return <ProfilePicker onSelectProvider={handleSelectProvider} />;
-
-    case 'chat':
-      if (!providerState) {
+      case 'select-provider':
         return <ProfilePicker onSelectProvider={handleSelectProvider} />;
-      }
 
-      if (providerState.providerType === 'cli') {
+      case 'chat':
+        if (!providerState) {
+          return <ProfilePicker onSelectProvider={handleSelectProvider} />;
+        }
+
+        if (providerState.providerType === 'cli') {
+          return (
+            <TerminalUI
+              provider={providerState.provider as 'gemini'}
+              processId={providerState.processId!}
+              onSwitchAI={() => {
+                window.electronAPI?.cli?.killGemini?.(providerState.processId!);
+                setProviderState(null);
+                setScreen('select-provider');
+              }}
+            />
+          );
+        }
+
         return (
-          <TerminalUI
-            provider={providerState.provider as 'gemini'}
-            processId={providerState.processId!}
-            onSwitchAI={() => {
-              window.electronAPI?.cli?.killGemini?.(providerState.processId!);
-              setProviderState(null);
-              setScreen('select-provider');
-            }}
+          <ChatInterface
+            provider={providerState.provider}
+            onLogout={handleLogout}
           />
         );
-      }
 
-      return (
-        <ChatInterface
-          provider={providerState.provider}
-          onLogout={handleLogout}
-        />
-      );
+      default:
+        return <StartingScreen onBegin={handleBegin} />;
+    }
+  };
 
-    default:
-      return <StartingScreen onBegin={handleBegin} />;
-  }
+  return (
+    <>
+      {renderContent()}
+      <CircuitBreakerModal />
+    </>
+  );
 }
