@@ -1,8 +1,8 @@
 # Unified Terminal — Project State
 
 ## Current Phase: 12 (File-Based Progress Monitor)
-## Current Plan: 2 of 6 (COMPLETE)
-## Last Completed: 12-02 (File Bridge & IPC Integration)
+## Current Plan: 4 of 6 (COMPLETE)
+## Last Completed: 12-04 (ActionOverlay & Status Files)
 ## Status: MILESTONE v2.0 IN PROGRESS
 ## Mode: PHASE 12 EXECUTION IN PROGRESS
 
@@ -107,6 +107,18 @@ Phase progress tracked in `.planning/phases/` directories and `ROADMAP.md`.
 - Duration: 2 minutes
 - Summary: `.planning/phases/12-progress-monitor/12-02-SUMMARY.md`
 
+**12-03: Frontend Screens (HomeScreen, ProgressScreen, CompleteScreen)** (2026-03-06)
+- Files: HomeScreen.tsx (85 lines), ProgressScreen.tsx (105 lines), CompleteScreen.tsx (95 lines)
+- Commits: c3a25b2, 159efff, 0c51b90
+- Duration: 2 minutes
+- Summary: `.planning/phases/12-progress-monitor/12-03-SUMMARY.md`
+
+**12-04: ActionOverlay & Status Files** (2026-03-06)
+- Files: ActionOverlay.tsx (99 lines), events.ts (+154 modified)
+- Commits: 6ddf210, 1c9c363
+- Duration: 2 minutes
+- Summary: `.planning/phases/12-progress-monitor/12-04-SUMMARY.md`
+
 ### Key Decisions
 
 1. **Dual folder fallback strategy** — Primary `~/Documents/Kenoki/`, fallback to `~/Desktop/Kenoki/` on permission errors
@@ -115,6 +127,8 @@ Phase progress tracked in `.planning/phases/` directories and `ROADMAP.md`.
 4. **chokidar stability threshold** — 100ms stabilityThreshold with 50ms pollInterval to prevent partial file reads
 5. **Workspace path mapping** — Extract path after `/workspace/`, map to flat `Files/` folder for simplicity
 6. **5 distinct IPC channels** — Separate channels for update/progress/file/action/complete instead of single discriminated union
+7. **Status file merge strategy** — Read existing file → merge with new status → write to prevent race conditions and data loss
+8. **Traffic light status metaphor** — GREEN (active), AMBER (progress > 70%), RED (done) for intuitive status representation
 
 ---
 
@@ -123,5 +137,5 @@ Phase progress tracked in `.planning/phases/` directories and `ROADMAP.md`.
 Run `/gsd:execute-phase 12` to continue Phase 12 plans
 
 **Wave 1 (parallel):** ~~12-01~~ ✅ + ~~12-02~~ ✅ — Backend foundation COMPLETE
-**Wave 2 (parallel):** 12-03 + 12-04 — Frontend screens + overlay
+**Wave 2 (parallel):** ~~12-03~~ ✅ + ~~12-04~~ ✅ — Frontend screens + overlay COMPLETE
 **Wave 3 (sequential):** 12-05 then 12-06 — Wiring + cleanup
