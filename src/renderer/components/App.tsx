@@ -14,6 +14,10 @@ import TokenEstimate from './TokenEstimate';
 import ProjectList from './ProjectList';
 import ProjectActions from './ProjectActions';
 import { DeveloperConsole } from './DeveloperConsole';
+import HomeScreen from '../screens/HomeScreen';
+import ProgressScreen from '../screens/ProgressScreen';
+import CompleteScreen from '../screens/CompleteScreen';
+import ActionOverlay from './ActionOverlay';
 
 // =============================================================================
 // TYPES (Projects - Post-Build Continuation)
@@ -59,13 +63,22 @@ export interface ProviderState {
   processId?: string;
 }
 
-type AppScreen = 'starting' | 'showcase' | 'select-provider' | 'chat' | 'installing' | 'projects' | 'project-actions';
+type AppScreen = 'starting' | 'home' | 'progress' | 'complete' | 'showcase' | 'select-provider' | 'chat' | 'installing' | 'projects' | 'project-actions';
 
 export default function App() {
   const [screen, setScreen] = useState<AppScreen>('starting');
   const [providerState, setProviderState] = useState<ProviderState | null>(null);
   const [buildPanelState, setBuildPanelState] = useState<PanelState>('hidden');
   const [selectedPrompt, setSelectedPrompt] = useState<string | null>(null);
+
+  // Progress monitor state
+  const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
+  const [currentProjectName, setCurrentProjectName] = useState<string>('');
+  const [completionData, setCompletionData] = useState<{
+    humanFolder: string;
+    deployedUrl?: string;
+    summary: { pages: number; components: number };
+  } | null>(null);
 
   // Trust & Safety state
   const [showTokenEstimate, setShowTokenEstimate] = useState(false);
@@ -105,6 +118,15 @@ export default function App() {
     checkProjects();
   }, []);
 
+  // Listen for project completion
+  useEffect(() => {
+    const unsubscribe = window.electronAPI?.project?.onComplete?.((data) => {
+      setCompletionData(data);
+      setScreen('complete');
+    });
+    return () => unsubscribe?.();
+  }, []);
+
   // Keyboard shortcut for dev mode toggle (Cmd+Shift+D / Ctrl+Shift+D)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -123,11 +145,16 @@ export default function App() {
   }, []);
 
   const handleBegin = () => {
-    // If user has existing projects, show project list first
-    if (hasProjects) {
-      setScreen('projects');
-    } else {
-      setScreen('showcase');
+    setScreen('home');
+  };
+
+  const handleBuild = async (prompt: string) => {
+    // Start project via IPC
+    const result = await window.electronAPI?.project?.start?.(prompt);
+    if (result) {
+      setCurrentProjectId(result.projectId);
+      setCurrentProjectName(result.projectName);
+      setScreen('progress');
     }
   };
 
@@ -305,6 +332,55 @@ ${prompt}`;
             <StartingScreen onBegin={handleBegin} />
             <TrustBadge position="bottom-left" theme="light" />
           </>
+        );
+
+      case 'home':
+        return (
+          <>
+            <HomeScreen
+              onBuild={handleBuild}
+              onOpenProject={(id) => {
+                // Resume existing project
+                setCurrentProjectId(id);
+                setScreen('progress');
+              }}
+            />
+            <TrustBadge position="bottom-left" theme="light" />
+          </>
+        );
+
+      case 'progress':
+        return (
+          <>
+            <ProgressScreen
+              projectName={currentProjectName}
+              onPause={() => {/* TODO */}}
+              onCancel={() => setScreen('home')}
+            />
+            <ActionOverlay onAction={(action) => {
+              window.electronAPI?.project?.respondToAction?.(action);
+            }} />
+          </>
+        );
+
+      case 'complete':
+        if (!completionData) return <div>Loading...</div>;
+        return (
+          <CompleteScreen
+            projectName={currentProjectName}
+            humanFolder={completionData.humanFolder}
+            deployedUrl={completionData.deployedUrl}
+            summary={completionData.summary}
+            onNewProject={() => {
+              setCurrentProjectId(null);
+              setCompletionData(null);
+              setScreen('home');
+            }}
+            onModify={() => {
+              // TODO: Implement modify flow
+              setScreen('progress');
+            }}
+          />
         );
 
       case 'showcase':
