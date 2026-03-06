@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import StartingScreen from './StartingScreen';
 import ShowcaseScreen from './ShowcaseScreen';
-import ProfilePicker, { Provider } from './ProfilePicker';
 import KenokiChat from './KenokiChat';
-// NOTE: ChatInterface removed - Kenoki is now primary input
+// NOTE: ChatInterface, ProfilePicker, ProviderScreen removed - V2 progress monitor paradigm
 import CircuitBreakerModal from './CircuitBreakerModal';
 import BuildPanel, { PanelState } from './BuildPanel';
 import TopBarPill from './TopBarPill';
@@ -22,6 +21,9 @@ import ActionOverlay from './ActionOverlay';
 // =============================================================================
 // TYPES (Projects - Post-Build Continuation)
 // =============================================================================
+
+// Provider type (moved from ProfilePicker - needed for ProviderState)
+type Provider = 'chatgpt' | 'gemini' | 'claude';
 
 type ProjectStatus = 'active' | 'archived';
 
@@ -212,15 +214,16 @@ ${prompt}`;
     setScreen('chat'); // Go directly to Kenoki chat
   };
 
+  // Legacy handler - kept for backward compatibility but redirects to home
   const handleSelectProvider = (state: ProviderState) => {
     setProviderState(state);
-    setScreen('chat');
+    setScreen('home'); // Redirect to home in V2
   };
 
   const handleLogout = async () => {
     await window.electronAPI?.providerView?.hide?.();
     setProviderState(null);
-    setScreen('select-provider');
+    setScreen('home'); // Redirect to home instead of provider picker
   };
 
   // Handle build panel state changes
@@ -237,9 +240,9 @@ ${prompt}`;
   // Listen for logout detection from any provider
   useEffect(() => {
     const cleanup = window.electronAPI?.provider?.onLogoutDetected?.((provider: string) => {
-      console.log(`[App] Logout detected for ${provider}, returning to ProfilePicker`);
+      console.log(`[App] Logout detected for ${provider}, returning to home`);
       setProviderState(null);
-      setScreen('select-provider');
+      setScreen('home'); // Redirect to home instead of provider picker
     });
 
     return () => {
@@ -257,7 +260,7 @@ ${prompt}`;
       if (data.processId === providerState.processId) {
         console.log(`[App] CLI process exited with code ${data.exitCode}`);
         setProviderState(null);
-        setScreen('select-provider');
+        setScreen('home'); // Redirect to home instead of provider picker
       }
     });
 
@@ -286,11 +289,11 @@ ${prompt}`;
         };
       });
 
-      // When installation completes, transition back to provider selection
+      // When installation completes, transition back to home
       if (data.status === 'complete' || data.status === 'error') {
         setTimeout(() => {
           setInstallerState(null);
-          setScreen('select-provider');
+          setScreen('home'); // Redirect to home instead of provider picker
         }, 2000);
       }
     });
@@ -320,7 +323,7 @@ ${prompt}`;
   // Handler for installer cancel
   const handleInstallerCancel = useCallback(() => {
     setInstallerState(null);
-    setScreen('select-provider');
+    setScreen('home'); // Redirect to home instead of provider picker
   }, []);
 
   // Render content based on current screen
@@ -392,11 +395,15 @@ ${prompt}`;
         );
 
       case 'select-provider':
-        return <ProfilePicker onSelectProvider={handleSelectProvider} initialPrompt={selectedPrompt} />;
+        // Redirect to home - provider selection removed in V2
+        setScreen('home');
+        return null;
 
       case 'installing':
         if (!installerState) {
-          return <ProfilePicker onSelectProvider={handleSelectProvider} initialPrompt={selectedPrompt} />;
+          // Redirect to home if no installer state
+          setScreen('home');
+          return null;
         }
         return (
           <InstallerReassurance
