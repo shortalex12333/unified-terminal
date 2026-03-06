@@ -1,1 +1,433 @@
-[]
+{
+  "skills": {
+    "gsd-planner": {
+      "path": "skills/workers/gsd-planner.md",
+      "triggers": ["plan", "decompose", "breakdown", "tasks", "requirements", "design", "dependencies"],
+      "runtime": "codex",
+      "skill_type": "worker"
+    },
+    "gsd-executor": {
+      "path": "skills/workers/gsd-executor.md",
+      "triggers": ["execute", "implement", "build", "code", "create", "make", "develop"],
+      "runtime": "codex",
+      "skill_type": "worker"
+    },
+    "gsd-debugger": {
+      "path": "skills/workers/gsd-debugger.md",
+      "triggers": ["debug", "bug", "error", "fix", "investigate", "diagnose", "troubleshoot", "failing", "broken", "crash"],
+      "runtime": "codex",
+      "skill_type": "worker"
+    },
+    "gsd-verifier": {
+      "path": "skills/workers/gsd-verifier.md",
+      "triggers": ["verify", "check", "validate", "test", "confirm", "prove", "verification", "goal check"],
+      "runtime": "codex",
+      "skill_type": "worker"
+    },
+    "gsd-researcher": {
+      "path": "skills/workers/gsd-researcher.md",
+      "triggers": ["research", "investigate", "find", "search", "learn", "discover", "study", "explore", "docs", "documentation"],
+      "runtime": "any",
+      "skill_type": "worker"
+    },
+    "gsd-codebase-mapper": {
+      "path": "skills/workers/gsd-codebase-mapper.md",
+      "triggers": ["analyze", "map", "explore", "understand", "architecture", "structure", "tech stack", "code quality", "conventions", "concerns"],
+      "runtime": "codex",
+      "skill_type": "worker"
+    },
+    "tdd-guide": {
+      "path": "skills/workers/tdd-guide.md",
+      "triggers": ["test", "tests", "tdd", "unit test", "coverage", "write tests", "testing"],
+      "runtime": "sonnet",
+      "skill_type": "worker"
+    },
+    "code-reviewer": {
+      "path": "skills/workers/code-reviewer.md",
+      "triggers": ["review", "code review", "pr review", "check code", "review changes"],
+      "runtime": "sonnet",
+      "skill_type": "worker"
+    },
+    "security-reviewer": {
+      "path": "skills/workers/security-reviewer.md",
+      "triggers": ["security", "audit", "vulnerability", "secrets", "owasp", "injection", "xss"],
+      "runtime": "sonnet",
+      "skill_type": "worker"
+    },
+    "build-error-resolver": {
+      "path": "skills/workers/build-error-resolver.md",
+      "triggers": ["build error", "type error", "tsc", "typescript error", "build failed", "compilation error"],
+      "runtime": "sonnet",
+      "skill_type": "worker"
+    },
+    "doc-updater": {
+      "path": "skills/workers/doc-updater.md",
+      "triggers": ["docs", "documentation", "codemap", "readme", "update docs", "generate docs"],
+      "runtime": "haiku",
+      "skill_type": "worker"
+    },
+    "web-researcher": {
+      "path": "skills/workers/web-researcher.md",
+      "triggers": ["research", "search web", "find online", "lookup", "investigate url", "fetch page", "web search", "gather evidence"],
+      "runtime": "any",
+      "skill_type": "worker"
+    },
+    "worker-deploy": {
+      "path": "skills/workers/worker-deploy.md",
+      "triggers": ["deploy", "deployment", "ship", "release", "publish", "go live", "push to production", "vercel", "gh-pages"],
+      "runtime": "sonnet",
+      "skill_type": "worker"
+    },
+    "worker-image-gen": {
+      "path": "skills/workers/worker-image-gen.md",
+      "triggers": ["generate image", "create image", "make image", "hero image", "logo", "product photo", "background", "dalle", "image generation", "visual", "graphic"],
+      "runtime": "any",
+      "skill_type": "worker"
+    },
+    "discuss": {
+      "path": "skills/phases/discuss.md",
+      "triggers": ["discuss", "context", "clarify", "requirements", "gray areas", "decisions", "user preferences"],
+      "runtime": "interactive",
+      "skill_type": "phase"
+    },
+    "plan": {
+      "path": "skills/phases/plan.md",
+      "triggers": ["plan", "create plans", "break down", "task breakdown", "implementation plan", "PLAN.md"],
+      "runtime": "orchestrated",
+      "skill_type": "phase"
+    },
+    "execute": {
+      "path": "skills/phases/execute.md",
+      "triggers": ["execute", "run", "implement", "build", "do the work", "spawn agents"],
+      "runtime": "orchestrated",
+      "skill_type": "phase"
+    },
+    "verify": {
+      "path": "skills/phases/verify.md",
+      "triggers": ["verify", "check", "validate", "goal achievement", "must-haves", "verification"],
+      "runtime": "orchestrated",
+      "skill_type": "phase"
+    },
+    "unify": {
+      "path": "skills/phases/unify.md",
+      "triggers": ["after APPLY phase complete", "loop closure", "plan reconciliation", "summary creation", "phase completion"],
+      "runtime": "any",
+      "skill_type": "phase"
+    },
+    "frontend-design": {
+      "path": "skills/frontend-design/SKILL.md",
+      "triggers": ["website", "landing page", "dashboard", "UI", "design", "frontend", "component", "button", "modal", "navbar", "sidebar", "card", "table", "form", "chart", "glassmorphism", "minimalism", "dark mode", "responsive"],
+      "runtime": "any",
+      "skill_type": "frontend"
+    },
+    "verification-integrity": {
+      "path": "skills/verification/verification-integrity.md",
+      "triggers": ["test verification", "build verification", "false positive detection", "stub detection", "CI checking"],
+      "runtime": "any",
+      "skill_type": "verification"
+    },
+    "docker-local-first": {
+      "path": "skills/verification/docker-local-first.md",
+      "triggers": ["docker build", "container verification", "local testing", "pre-push validation", "health check"],
+      "runtime": "docker",
+      "skill_type": "verification"
+    },
+    "pa-comparison": {
+      "path": "skills/messenger/pa-comparison.md",
+      "triggers": ["step_transition", "phase_boundary", "executor_switch", "handoff", "output_mismatch", "compare output", "semantic check"],
+      "runtime": "internal",
+      "skill_type": "internal"
+    },
+    "conductor-system": {
+      "path": "skills/orchestration/conductor-system.md",
+      "triggers": ["classify", "route", "tier", "dag", "orchestrate", "dispatch", "replan", "complexity"],
+      "runtime": "codex",
+      "skill_type": "orchestration"
+    },
+    "intake": {
+      "path": "skills/orchestration/intake.md",
+      "triggers": ["intake", "brief", "onboard", "first message", "user request", "project start", "what do you want"],
+      "runtime": "chatgpt-web",
+      "skill_type": "orchestration"
+    },
+    "archivist": {
+      "path": "skills/workers/archivist.md",
+      "triggers": ["archive", "close project", "finish project", "handover", "project complete", "generate archive", "document project"],
+      "runtime": "any",
+      "skill_type": "worker"
+    },
+    "worker-scaffold": {
+      "path": "skills/workers/worker-scaffold.md",
+      "triggers": ["scaffold", "bootstrap", "init", "new project", "start project", "create project", "setup", "npm init", "git init"],
+      "runtime": "codex",
+      "skill_type": "worker"
+    },
+    "worker-backend": {
+      "path": "skills/workers/worker-backend.md",
+      "triggers": ["api", "backend", "server", "database", "auth", "route", "endpoint", "migration", "REST", "graphql", "trpc", "middleware", "validation"],
+      "runtime": "codex",
+      "skill_type": "worker"
+    }
+  },
+  "trigger_index": {
+    "plan": ["gsd-planner", "plan"],
+    "decompose": ["gsd-planner"],
+    "breakdown": ["gsd-planner"],
+    "tasks": ["gsd-planner"],
+    "requirements": ["gsd-planner", "discuss"],
+    "design": ["gsd-planner", "frontend-design"],
+    "dependencies": ["gsd-planner"],
+    "execute": ["gsd-executor", "execute"],
+    "implement": ["gsd-executor", "execute"],
+    "build": ["gsd-executor", "execute"],
+    "code": ["gsd-executor"],
+    "create": ["gsd-executor"],
+    "make": ["gsd-executor"],
+    "develop": ["gsd-executor"],
+    "debug": ["gsd-debugger"],
+    "bug": ["gsd-debugger"],
+    "error": ["gsd-debugger"],
+    "fix": ["gsd-debugger"],
+    "investigate": ["gsd-debugger", "gsd-researcher"],
+    "diagnose": ["gsd-debugger"],
+    "troubleshoot": ["gsd-debugger"],
+    "failing": ["gsd-debugger"],
+    "broken": ["gsd-debugger"],
+    "crash": ["gsd-debugger"],
+    "verify": ["gsd-verifier", "verify"],
+    "check": ["gsd-verifier", "verify"],
+    "validate": ["gsd-verifier", "verify"],
+    "test": ["gsd-verifier", "tdd-guide"],
+    "confirm": ["gsd-verifier"],
+    "prove": ["gsd-verifier"],
+    "verification": ["gsd-verifier", "verify"],
+    "goal check": ["gsd-verifier"],
+    "research": ["gsd-researcher", "web-researcher"],
+    "find": ["gsd-researcher"],
+    "search": ["gsd-researcher"],
+    "learn": ["gsd-researcher"],
+    "discover": ["gsd-researcher"],
+    "study": ["gsd-researcher"],
+    "explore": ["gsd-researcher", "gsd-codebase-mapper"],
+    "docs": ["gsd-researcher", "doc-updater"],
+    "documentation": ["gsd-researcher", "doc-updater"],
+    "analyze": ["gsd-codebase-mapper"],
+    "map": ["gsd-codebase-mapper"],
+    "understand": ["gsd-codebase-mapper"],
+    "architecture": ["gsd-codebase-mapper"],
+    "structure": ["gsd-codebase-mapper"],
+    "tech stack": ["gsd-codebase-mapper"],
+    "code quality": ["gsd-codebase-mapper"],
+    "conventions": ["gsd-codebase-mapper"],
+    "concerns": ["gsd-codebase-mapper"],
+    "tests": ["tdd-guide"],
+    "tdd": ["tdd-guide"],
+    "unit test": ["tdd-guide"],
+    "coverage": ["tdd-guide"],
+    "write tests": ["tdd-guide"],
+    "testing": ["tdd-guide"],
+    "review": ["code-reviewer"],
+    "code review": ["code-reviewer"],
+    "pr review": ["code-reviewer"],
+    "check code": ["code-reviewer"],
+    "review changes": ["code-reviewer"],
+    "security": ["security-reviewer"],
+    "audit": ["security-reviewer"],
+    "vulnerability": ["security-reviewer"],
+    "secrets": ["security-reviewer"],
+    "owasp": ["security-reviewer"],
+    "injection": ["security-reviewer"],
+    "xss": ["security-reviewer"],
+    "build error": ["build-error-resolver"],
+    "type error": ["build-error-resolver"],
+    "tsc": ["build-error-resolver"],
+    "typescript error": ["build-error-resolver"],
+    "build failed": ["build-error-resolver"],
+    "compilation error": ["build-error-resolver"],
+    "codemap": ["doc-updater"],
+    "readme": ["doc-updater"],
+    "update docs": ["doc-updater"],
+    "generate docs": ["doc-updater"],
+    "search web": ["web-researcher"],
+    "find online": ["web-researcher"],
+    "lookup": ["web-researcher"],
+    "investigate url": ["web-researcher"],
+    "fetch page": ["web-researcher"],
+    "web search": ["web-researcher"],
+    "gather evidence": ["web-researcher"],
+    "deploy": ["worker-deploy"],
+    "deployment": ["worker-deploy"],
+    "ship": ["worker-deploy"],
+    "release": ["worker-deploy"],
+    "publish": ["worker-deploy"],
+    "go live": ["worker-deploy"],
+    "push to production": ["worker-deploy"],
+    "vercel": ["worker-deploy"],
+    "gh-pages": ["worker-deploy"],
+    "generate image": ["worker-image-gen"],
+    "create image": ["worker-image-gen"],
+    "make image": ["worker-image-gen"],
+    "hero image": ["worker-image-gen"],
+    "logo": ["worker-image-gen"],
+    "product photo": ["worker-image-gen"],
+    "background": ["worker-image-gen"],
+    "dalle": ["worker-image-gen"],
+    "image generation": ["worker-image-gen"],
+    "visual": ["worker-image-gen"],
+    "graphic": ["worker-image-gen"],
+    "discuss": ["discuss"],
+    "context": ["discuss"],
+    "clarify": ["discuss"],
+    "gray areas": ["discuss"],
+    "decisions": ["discuss"],
+    "user preferences": ["discuss"],
+    "create plans": ["plan"],
+    "break down": ["plan"],
+    "task breakdown": ["plan"],
+    "implementation plan": ["plan"],
+    "PLAN.md": ["plan"],
+    "run": ["execute"],
+    "do the work": ["execute"],
+    "spawn agents": ["execute"],
+    "goal achievement": ["verify"],
+    "must-haves": ["verify"],
+    "after APPLY phase complete": ["unify"],
+    "loop closure": ["unify"],
+    "plan reconciliation": ["unify"],
+    "summary creation": ["unify"],
+    "phase completion": ["unify"],
+    "website": ["frontend-design"],
+    "landing page": ["frontend-design"],
+    "dashboard": ["frontend-design"],
+    "UI": ["frontend-design"],
+    "frontend": ["frontend-design"],
+    "component": ["frontend-design"],
+    "button": ["frontend-design"],
+    "modal": ["frontend-design"],
+    "navbar": ["frontend-design"],
+    "sidebar": ["frontend-design"],
+    "card": ["frontend-design"],
+    "table": ["frontend-design"],
+    "form": ["frontend-design"],
+    "chart": ["frontend-design"],
+    "glassmorphism": ["frontend-design"],
+    "minimalism": ["frontend-design"],
+    "dark mode": ["frontend-design"],
+    "responsive": ["frontend-design"],
+    "test verification": ["verification-integrity"],
+    "build verification": ["verification-integrity"],
+    "false positive detection": ["verification-integrity"],
+    "stub detection": ["verification-integrity"],
+    "CI checking": ["verification-integrity"],
+    "docker build": ["docker-local-first"],
+    "container verification": ["docker-local-first"],
+    "local testing": ["docker-local-first"],
+    "pre-push validation": ["docker-local-first"],
+    "health check": ["docker-local-first"],
+    "step_transition": ["pa-comparison"],
+    "phase_boundary": ["pa-comparison"],
+    "executor_switch": ["pa-comparison"],
+    "handoff": ["pa-comparison"],
+    "output_mismatch": ["pa-comparison"],
+    "compare output": ["pa-comparison"],
+    "semantic check": ["pa-comparison"],
+    "classify": ["conductor-system"],
+    "route": ["conductor-system"],
+    "tier": ["conductor-system"],
+    "dag": ["conductor-system"],
+    "orchestrate": ["conductor-system"],
+    "dispatch": ["conductor-system"],
+    "replan": ["conductor-system"],
+    "complexity": ["conductor-system"],
+    "intake": ["intake"],
+    "brief": ["intake"],
+    "onboard": ["intake"],
+    "first message": ["intake"],
+    "user request": ["intake"],
+    "project start": ["intake"],
+    "what do you want": ["intake"],
+    "close project": ["archivist"],
+    "finish project": ["archivist"],
+    "handover": ["archivist"],
+    "project complete": ["archivist"],
+    "generate archive": ["archivist"],
+    "document project": ["archivist"],
+    "start project": ["worker-scaffold"],
+    "npm init": ["worker-scaffold"],
+    "git init": ["worker-scaffold"],
+    "api": ["worker-backend"],
+    "backend": ["worker-backend"],
+    "server": ["worker-backend"],
+    "database": ["worker-backend"],
+    "auth": ["worker-backend"],
+    "route": ["worker-backend"],
+    "endpoint": ["worker-backend"],
+    "migration": ["worker-backend"],
+    "REST": ["worker-backend"],
+    "graphql": ["worker-backend"],
+    "trpc": ["worker-backend"],
+    "middleware": ["worker-backend"],
+    "validation": ["worker-backend"]
+  },
+  "routing_rules": {
+    "investigate": {
+      "prefer": "gsd-debugger",
+      "condition": "if error/bug/failure context",
+      "fallback": "gsd-researcher"
+    },
+    "research": {
+      "prefer": "gsd-researcher",
+      "condition": "if codebase/internal context",
+      "fallback": "web-researcher"
+    },
+    "learn": {
+      "prefer": "gsd-researcher",
+      "condition": "if learning/studying context"
+    }
+  },
+  "coverage_gaps": {
+    "documented": "2026-03-03",
+    "missing_domains": [
+      "database (schema, migration, query, backup)",
+      "devops (kubernetes, CI/CD, infrastructure)",
+      "performance (optimize, profiling, benchmark)",
+      "refactoring (refactor, cleanup, simplify)",
+      "api-design (REST, GraphQL, endpoint)",
+      "accessibility (a11y, wcag, aria)",
+      "i18n (localization, translation)",
+      "monitoring (telemetry, tracing, alerts)"
+    ],
+    "planned_for": "future version"
+  },
+  "templates": {
+    "_description": "Output templates for structured content - these are NOT skills, just formatting guides",
+    "lesson-template": {
+      "path": "skills/templates/lesson-template.md",
+      "purpose": "Structured format for recording lessons learned"
+    },
+    "archive-template": {
+      "path": "skills/templates/archive-template.md",
+      "purpose": "Structured format for project archives"
+    },
+    "llms-txt-template": {
+      "path": "skills/templates/llms-txt-template.md",
+      "purpose": "Format for AI-readable project summaries"
+    }
+  },
+  "metadata": {
+    "generated": "2026-03-03",
+    "last_verified": "2026-03-03",
+    "skill_count": 28,
+    "template_count": 3,
+    "trigger_count": 164,
+    "source_directory": "skills/",
+    "skill_types": {
+      "worker": 17,
+      "phase": 5,
+      "verification": 2,
+      "orchestration": 2,
+      "frontend": 1,
+      "internal": 1
+    }
+  }
+}
