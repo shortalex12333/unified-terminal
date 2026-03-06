@@ -1,0 +1,39 @@
+### All Agents
+
+  Actors (10)
+
+  1. Spine Agent
+  2. Conductor (Router)
+  3. PA / Messenger
+  4. Skill/MCP Injector
+  5. Worker Agents (task-scoped LLM workers)
+  6. Bodyguard (Hard Rails dispatcher)
+  7. Context Warden
+  8. Cron Layer
+  9. Archivist
+  10. Intake
+
+  Workers (22)
+
+  1. Executor
+  2. Planner
+  3. Researcher
+  4. Debugger
+  5. Verifier
+  6. Codebase Mapper
+  7. TDD Guide
+  8. Code Reviewer
+  9. Security Reviewer
+  10. Build Error Resolver
+  11. Doc Updater
+  12. Deploy Agent
+  13. Image Generator
+  14. Web Researcher
+  15. Frontend Builder
+  16. Archivist
+  17. Scaffold Worker
+  18. Backend Worker
+  19. Database Worker
+  20. DevOps Worker
+  21. Performance Optimizer
+  22. API Designer

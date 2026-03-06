@@ -198,6 +198,9 @@ import { installInterceptor, setupInterceptorIPC } from './send-interceptor';
 // Status Agent (User-facing translation layer)
 import { initializeStatusAgent, cleanupStatusAgent } from '../status-agent';
 
+// System Event Bus (for debug logging)
+import { systemEvents, StatusEvent } from './events';
+
 // MCP (Model Context Protocol) Account Connection
 import {
   getMCPManager,
@@ -233,6 +236,103 @@ export const isTestMode = process.argv.includes('--test-mode');
 
 if (isTestMode) {
   console.log('[App] Running in TEST MODE -- skipping ChatGPT, updater, tray');
+}
+
+// ============================================================================
+// DEVELOPER MODE FLAG
+// ============================================================================
+
+/**
+ * When --dev-mode is passed or DEV_MODE env is set:
+ * - Opens DevTools for ChatGPT BrowserView
+ * - Creates a visible Debug Window showing CLI output
+ * - Logs more verbose information
+ * This helps creators see what's happening during builds.
+ */
+export const isDevMode = process.argv.includes('--dev-mode') || process.env.DEV_MODE === 'true';
+
+if (isDevMode) {
+  console.log('[App] Running in DEVELOPER MODE -- background processes visible');
+}
+
+let debugWindow: BrowserWindow | null = null;
+
+/**
+ * Create debug window for showing CLI output and Conductor status
+ */
+function createDebugWindow(): BrowserWindow {
+  const debug = new BrowserWindow({
+    width: 800,
+    height: 600,
+    title: 'Kenoki Debug - Conductor & CLI Output',
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+    },
+  });
+
+  // Load a simple HTML page that displays logs
+  debug.loadURL(`data:text/html,
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Kenoki Debug</title>
+      <style>
+        body {
+          font-family: 'SF Mono', Monaco, monospace;
+          background: #1a1a2e;
+          color: #eee;
+          padding: 16px;
+          margin: 0;
+        }
+        h1 { color: #00d9ff; font-size: 18px; margin: 0 0 16px; }
+        #logs {
+          white-space: pre-wrap;
+          font-size: 12px;
+          line-height: 1.5;
+          max-height: calc(100vh - 60px);
+          overflow-y: auto;
+        }
+        .cli { color: #4ade80; }
+        .conductor { color: #f472b6; }
+        .error { color: #ef4444; }
+        .info { color: #60a5fa; }
+      </style>
+    </head>
+    <body>
+      <h1>🔧 Conductor & CLI Debug Output</h1>
+      <div id="logs">Waiting for activity...</div>
+      <script>
+        window.addEventListener('message', (e) => {
+          const logs = document.getElementById('logs');
+          const div = document.createElement('div');
+          div.className = e.data.type || 'info';
+          div.textContent = '[' + new Date().toLocaleTimeString() + '] ' + e.data.message;
+          logs.appendChild(div);
+          logs.scrollTop = logs.scrollHeight;
+        });
+      </script>
+    </body>
+    </html>
+  `);
+
+  debug.on('closed', () => {
+    debugWindow = null;
+  });
+
+  return debug;
+}
+
+/**
+ * Send message to debug window
+ */
+export function debugLog(message: string, type: 'cli' | 'conductor' | 'error' | 'info' = 'info'): void {
+  console.log(`[Debug:${type}] ${message}`);
+  if (debugWindow && !debugWindow.isDestroyed()) {
+    debugWindow.webContents.executeJavaScript(
+      `window.postMessage({ message: ${JSON.stringify(message)}, type: '${type}' }, '*')`
+    );
+  }
 }
 
 // ============================================================================
@@ -710,6 +810,12 @@ function createMainWindow(): void {
 app.whenReady().then(() => {
   createMainWindow();
 
+  // Create debug window in developer mode
+  if (isDevMode) {
+    debugWindow = createDebugWindow();
+    debugLog('Developer mode active - showing background processes', 'info');
+  }
+
   // Set up response capture IPC handlers (Gate 3)
   setupCaptureIPC(() => chatGPTView);
 
@@ -866,6 +972,21 @@ app.whenReady().then(() => {
   if (mainWindow) {
     initializeStatusAgent(mainWindow);
     console.log('[App] Status Agent initialized');
+  }
+
+  // In dev mode, forward all system events to debug window
+  if (isDevMode) {
+    systemEvents.on('*', (event: StatusEvent) => {
+      const typeMap: Record<string, 'cli' | 'conductor' | 'error' | 'info'> = {
+        worker: 'cli',
+        conductor: 'conductor',
+        scheduler: 'conductor',
+        error: 'error',
+      };
+      const type = typeMap[event.source] || 'info';
+      debugLog(`[${event.source}:${event.type}] ${event.detail}`, type);
+    });
+    console.log('[App] Debug event forwarding enabled');
   }
 
   // Initialize MCP Manager (Model Context Protocol Account Connection)
@@ -2327,8 +2448,11 @@ ipcMain.handle('conductor:classify', async (
   context?: Record<string, any>
 ): Promise<ExecutionPlan> => {
   console.log(`[IPC] conductor:classify called: "${message.substring(0, 50)}..."`);
+  debugLog(`Conductor classifying: "${message.substring(0, 80)}..."`, 'conductor');
   const conductor = getConductor();
-  return conductor.classify(message, context);
+  const plan = await conductor.classify(message, context);
+  debugLog(`Conductor returned ${plan.plan.length} steps, route: ${plan.route}`, 'conductor');
+  return plan;
 });
 
 /**
@@ -2342,6 +2466,11 @@ ipcMain.handle('conductor:execute', async (
   conductorPlan: ExecutionPlan
 ): Promise<void> => {
   console.log(`[IPC] conductor:execute called with ${conductorPlan.plan.length} steps`);
+  debugLog(`Executing plan with ${conductorPlan.plan.length} steps`, 'conductor');
+  conductorPlan.plan.forEach((step, i) => {
+    debugLog(`  Step ${step.id}: [${step.target}] ${step.action}`, 'conductor');
+  });
+
   const scheduler = getStepScheduler();
 
   // Convert conductor ExecutionPlan to scheduler ExecutionPlan format
@@ -2475,6 +2604,12 @@ ipcMain.handle('provider:show-view', async (
     const url = PROVIDER_URLS[provider];
     console.log(`[Provider View] Loading ${provider}: ${url}`);
     await chatGPTView.webContents.loadURL(url);
+
+    // In dev mode, open DevTools for the BrowserView
+    if (isDevMode) {
+      chatGPTView.webContents.openDevTools({ mode: 'detach' });
+      debugLog(`Opened DevTools for ${provider} BrowserView`, 'info');
+    }
 
     return { success: true };
   } catch (error) {
