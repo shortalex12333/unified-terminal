@@ -5,6 +5,8 @@
     { "src": "KENOKI_LANDING_PAGE/api/**/*.js", "use": "@vercel/node" }
   ],
   "routes": [
-    { "src": "/api/(.*)", "dest": "KENOKI_LANDING_PAGE/api/$1.js" }
+    { "src": "/api/(.*)", "dest": "KENOKI_LANDING_PAGE/api/$1.js" },
+    { "handle": "filesystem" },
+    { "src": "/.*", "dest": "/index.html" }
   ]
 }
