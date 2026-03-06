@@ -16,6 +16,8 @@ import {
   PermissionRequestHandlerHandlerDetails,
 } from 'electron';
 import * as os from 'os';
+import * as fs from 'fs';
+import * as path from 'path';
 import {
   injectText,
   triggerSend,
@@ -167,7 +169,6 @@ import {
   ErrorRecoveredEvent,
   RecoveryFailedEvent,
 } from './error-types';
-import * as path from 'path';
 
 // Failure System (Graceful Failure UX)
 import {
@@ -1551,62 +1552,103 @@ ipcMain.handle('cli:translate', async (
  * IPC: Send message to conductor for classification and execution.
  * This is the primary input path for Kenoki.
  *
- * MVP: Uses local classifier (no API needed) instead of Codex.
+ * MVP: Spawns Claude Code directly with user's prompt.
  */
 import { classifyLocally } from './local-classifier';
+import { spawn as spawnChild } from 'child_process';
+import { backendTerminal } from './dev-logger';
 
 ipcMain.handle('conductor:send', async (event, message: string): Promise<void> => {
   console.log('[IPC] conductor:send called:', message.substring(0, 50) + '...');
   const window = BrowserWindow.fromWebContents(event.sender);
 
   try {
-    // Notify UI that we're starting
-    window?.webContents.send('conductor:status', {
-      status: 'classifying',
-      message: 'Analyzing your request...',
-    });
-
-    // Use local classifier (no API needed for MVP)
+    // Quick local classification for context
     const classification = classifyLocally(message);
-    console.log('[IPC] Local classification:', classification);
+    console.log('[IPC] Classification:', classification.projectType);
 
-    // Notify UI about the classification
+    // Notify UI
     window?.webContents.send('conductor:status', {
       status: 'executing',
-      message: `Identified: ${classification.projectType} project`,
+      message: `Building ${classification.projectType} project...`,
     });
-
-    // Build response showing what we understood
-    const response = `**Project Analysis**
-
-Type: ${classification.projectType.toUpperCase()}
-Goal: ${classification.extractedGoal}
-Suggested name: ${classification.suggestedName}
-Route: ${classification.route}
-Confidence: ${Math.round(classification.confidence * 100)}%
-
-**Skills needed:**
-${classification.skills.length > 0 ? classification.skills.map(s => `- ${s}`).join('\n') : '- (none identified)'}
-
----
-
-*Ready to execute via ${classification.route === 'cli' ? 'Claude Code / Codex' : 'web interface'}*
-
-**Next step:** Wire up actual CLI execution to build this project.`;
 
     window?.webContents.send('conductor:output', {
       type: 'chunk',
-      content: response,
+      content: `**Starting:** ${classification.suggestedName} (${classification.projectType})\n\n`,
     });
 
-    // Mark complete
-    window?.webContents.send('conductor:output', {
-      type: 'complete',
-      content: '',
+    // Create project directory
+    const projectDir = path.join(os.homedir(), 'Documents', 'kenoki-projects', classification.suggestedName);
+    if (!fs.existsSync(projectDir)) {
+      fs.mkdirSync(projectDir, { recursive: true });
+    }
+
+    // Spawn Claude Code with the user's prompt
+    const sessionId = `claude-${Date.now()}`;
+    const args = ['--print', '--dangerously-skip-permissions', message];
+
+    backendTerminal.agentSpawn(sessionId, 'claude', 'claude', args);
+    backendTerminal.stdin(sessionId, message);
+
+    const env = { ...process.env };
+    delete env.CLAUDECODE; // Allow nested Claude execution
+
+    const claude = spawnChild('claude', args, {
+      cwd: projectDir,
+      env,
+      shell: true,
     });
 
-    window?.webContents.send('conductor:status', {
-      status: 'done',
+    // Stream stdout to UI
+    claude.stdout?.on('data', (data: Buffer) => {
+      const chunk = data.toString();
+      backendTerminal.stdout(sessionId, chunk);
+      window?.webContents.send('conductor:output', {
+        type: 'chunk',
+        content: chunk,
+      });
+    });
+
+    // Stream stderr
+    claude.stderr?.on('data', (data: Buffer) => {
+      const chunk = data.toString();
+      backendTerminal.stderr(sessionId, chunk);
+      if (chunk.toLowerCase().includes('error')) {
+        window?.webContents.send('conductor:output', {
+          type: 'chunk',
+          content: `⚠️ ${chunk}`,
+        });
+      }
+    });
+
+    // Handle completion
+    claude.on('close', (code) => {
+      backendTerminal.agentExit(sessionId, code ?? 0);
+
+      if (code === 0) {
+        window?.webContents.send('conductor:output', {
+          type: 'chunk',
+          content: `\n\n✅ **Done!** Project at: ${projectDir}`,
+        });
+        window?.webContents.send('conductor:output', { type: 'complete', content: '' });
+        window?.webContents.send('conductor:status', { status: 'done' });
+      } else {
+        window?.webContents.send('conductor:output', {
+          type: 'error',
+          content: `Build exited with code ${code}`,
+        });
+        window?.webContents.send('conductor:status', { status: 'error', message: `Exit ${code}` });
+      }
+    });
+
+    claude.on('error', (err) => {
+      backendTerminal.agentExit(sessionId, -1);
+      window?.webContents.send('conductor:output', {
+        type: 'error',
+        content: `Failed to start Claude: ${err.message}`,
+      });
+      window?.webContents.send('conductor:status', { status: 'error', message: err.message });
     });
 
   } catch (err) {
