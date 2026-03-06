@@ -380,6 +380,45 @@ From `LLM_AGENTIC_WORKFLOW_LIMITATIONS.md`:
 
 ---
 
+## Storekeeper Pattern (Authoritative)
+
+In the Unified Terminal architecture, skills are NOT selected by code matching. The **Storekeeper Pattern** governs all tool access:
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│  STOREKEEPER PATTERN: Worker Requests, Storekeeper Fulfills         │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  1. REQUESTED by Worker                                             │
+│     Worker writes tool request file with justification              │
+│     File: .kenoki/requests/step-{id}-request.yaml                   │
+│                                                                     │
+│  2. VALIDATED by Storekeeper                                        │
+│     Checks inventory (skills, MCP connections, plugins)             │
+│     Checks token budget, tier limits                                │
+│                                                                     │
+│  3. APPROVED or DENIED                                              │
+│     Each requested item gets explicit approval/denial               │
+│     Reasons logged for audit trail                                  │
+│                                                                     │
+│  4. INJECTED by Storekeeper                                         │
+│     Approved skills → prompt injection                              │
+│     Approved MCP → connection verification                          │
+│     Approved plugins → runtime binding                              │
+│                                                                     │
+│  5. REMOVED on completion                                           │
+│     Storekeeper cleans up context after step                        │
+│     All checkouts logged to audit trail                             │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+**Key Principle:** Workers don't self-equip. The Storekeeper controls all tool access.
+
+**See:** `/docs/ONGOING_WORK/STOREKEEPER/STOREKEEPER-SPEC.md` for the full authoritative specification.
+
+---
+
 ## Summary
 
 | Aspect | Prompt Injection | /Skill |

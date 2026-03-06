@@ -67,101 +67,70 @@ Plans:
 
 ---
 
-## Milestone: v2.0 — Primary Input Architecture
+## Milestone: v2.0 — Progress Monitor Architecture
+
+> **PARADIGM SHIFT:** V2 replaces "chat mirror" with "progress monitor". User sees progress + output files, never LLM interface. See `.planning/architecture/v2-progress-monitor/INDEX.md` for full spec.
 
 ### Phase 11: Classification Layer
-**Status:** Not Started
+**Status:** Complete
 **Goal:** Build project type classifier and capability registry. Foundation for intelligent routing.
+**Summary:** 4 files (~580 lines), local-classifier.ts, 29 unit tests passing. Commit: de1b44e
 
-**Deliverables:**
-- `src/main/classification/types.ts` — Type definitions (~80 lines)
-- `src/main/classification/capability-registry.ts` — Hardcoded mapping (~150 lines)
-- `src/main/classification/project-classifier.ts` — Cheap Codex agent (~120 lines)
-- `src/main/classification/index.ts` — Barrel exports (~10 lines)
-- Unit tests for classifier and registry
+### Phase 12: File-Based Progress Monitor
+**Status:** Planning Complete
+**Goal:** Replace chat mirror with file-based transposition. User sees progress tree + output files, never LLM interface.
+**Plans:** 6 plans in 3 waves
+**Requirements:** [PM-01, PM-02, PM-03, PM-04, PM-05, PM-06, PM-07, PM-08, PM-09, PM-10, PM-11, PM-12]
 
-**Requirements Covered:** R2, R3
+Plans:
+- [ ] 12-01-PLAN.md — Backend: project-scaffold.ts + transposer.ts (Wave 1)
+- [ ] 12-02-PLAN.md — Backend: file-bridge.ts + global.d.ts IPC types (Wave 1)
+- [ ] 12-03-PLAN.md — Frontend: HomeScreen, ProgressScreen, CompleteScreen (Wave 2)
+- [ ] 12-04-PLAN.md — Frontend: ActionOverlay + events.ts file writing (Wave 2)
+- [ ] 12-05-PLAN.md — Wiring: App.tsx routing + preload.ts + index.ts FileBridge (Wave 3)
+- [ ] 12-06-PLAN.md — Cleanup: Delete ChatInterface, ProfilePicker, ProviderScreen (Wave 3)
 
-### Phase 12: Brief System
-**Status:** Not Started
-**Goal:** Build template-driven brief generation with targeted questions and hard validation.
+**Wave Structure:**
 
-**Deliverables:**
-- `src/main/brief/types.ts` — Brief interfaces (~100 lines)
-- `src/main/brief/templates/*.ts` — Templates for site, app, ecom, existing (~310 lines)
-- `src/main/brief/brief-generator.ts` — Creates brief from intent (~80 lines)
-- `src/main/brief/brief-agent.ts` — Asks targeted questions (~150 lines)
-- `src/main/brief/brief-validator.ts` — Hard rail validation (~100 lines)
-- `src/main/brief/index.ts` — Barrel exports (~15 lines)
-- Unit tests for templates, agent, validator
+| Wave | Plans | Files | Description |
+|------|-------|-------|-------------|
+| 1 | 12-01, 12-02 | 4 new files | Foundation: scaffolding, translation, file watching |
+| 2 | 12-03, 12-04 | 4 new files | Screens and overlays |
+| 3 | 12-05, 12-06 | 3 modified, 3 deleted | Integration and cleanup |
 
-**Requirements Covered:** R4, R5, R6
+**The Paradigm:**
+- Agents write to `~/.kenoki_projects/{id}/` (hidden)
+- File watcher copies to `~/Documents/Kenoki/{name}/` (visible)
+- Frontend subscribes to file changes, displays progress
+- User never sees ChatGPT, CLI terminals, or token counts
 
-### Phase 13: Entry Router & Orchestration
-**Status:** Not Started
-**Goal:** Route user choice to correct flow. Connect classification → brief → conductor.
+**Success Criteria:**
+- [ ] User types prompt → build starts
+- [ ] User sees progress tree, not LLM output
+- [ ] Files appear in `~/Documents/Kenoki/`
+- [ ] Action overlays work (MCP, decisions)
+- [ ] Complete screen shows working links
+- [ ] User NEVER sees ChatGPT interface
+- [ ] User NEVER sees terminal windows
+- [ ] Build compiles clean
+- [ ] Existing enforcement pipeline unchanged
 
-**Deliverables:**
-- `src/main/orchestration/entry-router.ts` — Flow routing logic (~80 lines)
-- `src/main/orchestration/index.ts` — Barrel exports (~10 lines)
-- MCP checker integration with mcp-manager.ts
-- IPC handlers for entry routing
-
-**Requirements Covered:** R7, R8
-
-### Phase 14: UI Components
-**Status:** Not Started
-**Goal:** Build React components for primary input flow.
-
-**Deliverables:**
-- `src/renderer/components/PrimaryInput.tsx` — Main entry screen (~200 lines)
-- `src/renderer/components/ProjectTypeCard.tsx` — Visual card (~80 lines)
-- `src/renderer/components/BriefQuestionnaire.tsx` — Q&A UI (~250 lines)
-- `src/renderer/components/MCPConnectionPrompt.tsx` — MCP modal (~120 lines)
-- App.tsx modifications for new routing
-- global.d.ts updates for new IPC types
-
-**Requirements Covered:** R10
-
-### Phase 15: Conductor Refactor
-**Status:** Not Started
-**Goal:** Refactor Conductor to receive complete briefs, not raw messages.
-
-**Deliverables:**
-- Remove `classify()` method from conductor.ts
-- Add `planFromBrief(brief, capabilities)` method
-- Update planning prompt to use full brief JSON
-- Integration tests proving brief → DAG flow
-
-**Requirements Covered:** R9
-
-### Phase 16: Integration & Migration
-**Status:** Not Started
-**Goal:** Wire all components together, feature flag, end-to-end testing.
-
-**Deliverables:**
-- Feature flag (`USE_NEW_FLOW`) implementation
-- Full IPC wiring in index.ts
-- End-to-end tests for all 4 entry paths
-- Deprecation markers on send-interceptor.ts, fast-path.ts
-- Migration documentation
-
-**Requirements Covered:** R11, R12
+**Spec Reference:** `.planning/architecture/v2-progress-monitor/`
+- `INDEX.md` — Quick links, summary, success criteria
+- `OVERVIEW.md` — Paradigm shift, 4 screens, two file worlds
+- `MIGRATION.md` — What stays/dies, migration steps
+- `VARIABLES.md` — All {{placeholders}}, JSON schemas, data flows
 
 ---
 
 ## Phase Timing Estimates
 
-| Phase | Effort | Cumulative |
-|-------|--------|------------|
-| Phase 11: Classification | 2-3 hours | 2-3 hours |
-| Phase 12: Brief System | 3-4 hours | 5-7 hours |
-| Phase 13: Entry Router | 1-2 hours | 6-9 hours |
-| Phase 14: UI Components | 3-4 hours | 9-13 hours |
-| Phase 15: Conductor Refactor | 1-2 hours | 10-15 hours |
-| Phase 16: Integration | 2-3 hours | 12-18 hours |
+| Phase | Effort | Status |
+|-------|--------|--------|
+| Phase 11: Classification | 2-3 hours | Complete |
+| Phase 12: Progress Monitor | 4-6 hours | Planning Complete |
 
-**Total Estimate:** 12-18 hours
+**Total Remaining:** 4-6 hours
 
 ---
 

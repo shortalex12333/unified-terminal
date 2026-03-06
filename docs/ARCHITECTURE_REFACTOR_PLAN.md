@@ -1,4 +1,14 @@
-# Kenoki Architecture Refactor: Primary Input Flow
+# ⚠️ SUPERSEDED — See V2 Architecture
+
+> **This document is outdated.** The V1 "chat mirror" approach has been replaced by V2 "progress monitor".
+>
+> **New location:** `.planning/architecture/v2-progress-monitor/INDEX.md`
+>
+> V2 removes all chat UI replication. User sees only progress + output files.
+
+---
+
+# [ARCHIVED] Kenoki Architecture Refactor: Primary Input Flow
 
 ## Executive Summary
 

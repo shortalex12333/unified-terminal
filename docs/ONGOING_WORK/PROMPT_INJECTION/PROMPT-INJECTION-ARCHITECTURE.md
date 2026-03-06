@@ -123,37 +123,31 @@ ASSEMBLED PROMPT ORDER:
   [7] CORRECTION    ← (only on retry) "Last attempt failed: forgot form validation."
 ```
 
-### 2.2 Source 2: SKILL (On-Demand, From Skill Injector)
+### 2.2 Source 2: SKILL (On-Demand, Via Storekeeper)
 
-The domain expertise the agent needs for THIS specific task. Selected by the Skill Injector using trigger-map.json matching.
+The domain expertise the agent needs for THIS specific task. Requested by Worker, validated by Storekeeper against inventory, approved/denied, then injected. See: `/docs/ONGOING_WORK/STOREKEEPER/STOREKEEPER-SPEC.md` for the authoritative specification.
 
-**Selection algorithm (hardcoded in `src/skill-injector/match.ts`):**
+**Storekeeper Pattern (supersedes old selection algorithm):**
 
-```typescript
-const SKILL_INJECTION_CONFIG = {
-  MIN_MATCH_SCORE:     0.2,     // Below this: no skill, generic worker
-  TIE_BREAK:           "first", // First in trigger-map order wins ties
-  MAX_SKILL_TOKENS:    2_000,   // Truncate if over
-  FRONTEND_BM25_TOP_K: 5,       // Append top 5 CSV results for frontend
-  FRONTEND_DEFAULT_Q:  "SaaS premium minimal clean apple whitespace",
-};
+The old `src/skill-injector/match.ts` pattern where code decided skills is DEPRECATED.
 
-function selectSkill(stepMandate: string, triggerMap: TriggerMap): SkillMatch | null {
-  const tokens = tokenize(stepMandate); // lowercase, remove stopwords
-  let bestMatch: SkillMatch | null = null;
+The new flow is: **Worker Requests, Storekeeper Fulfills**
 
-  for (const [skillName, skillData] of Object.entries(triggerMap)) {
-    const matchCount = skillData.triggers.filter(t => tokens.includes(t.toLowerCase())).length;
-    const score = matchCount / skillData.triggers.length;
+```
+Worker writes request → Storekeeper reads → Storekeeper validates → Storekeeper injects
+```
 
-    if (score > SKILL_INJECTION_CONFIG.MIN_MATCH_SCORE) {
-      if (!bestMatch || score > bestMatch.score) {
-        bestMatch = { skillName, score, file: skillData.file };
-      }
-    }
-  }
-  return bestMatch;
-}
+See: `/docs/ONGOING_WORK/STOREKEEPER/STOREKEEPER-SPEC.md` for:
+- Request file format (`.kenoki/requests/step-{id}-request.yaml`)
+- Response file format (`.kenoki/responses/step-{id}-response.yaml`)
+- Approval rules (inventory check, token budget, tier limits)
+- Audit trail (`.kenoki/audit/step-{id}-checkout.yaml`)
+
+Key changes from old pattern:
+- Workers REQUEST skills (with justification)
+- Storekeeper APPROVES or DENIES each request
+- Tools are RETURNED and logged after step completion
+- Full audit trail of all tool checkouts
 ```
 
 **Special case — Frontend Design skill:**

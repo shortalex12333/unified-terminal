@@ -7,7 +7,7 @@ Everything controlling the project lifecycle: routing requests, producing execut
 | Actor | Role | Rail Type |
 |-------|------|-----------|
 | Conductor | DAG from user request. Classifies Tier 0-3. Re-plans on failure. | HARD (phase gates) + SOFT (re-plan) |
-| Skill Injector | Reads Spine + next step, picks skill, pre-loads worker. | HARD (code match) |
+| Storekeeper | Receives worker tool requests, validates against inventory, approves/denies, injects. | HARD (code match) |
 | PA / Messenger | Compares step N output to step N+1 expectations. Pass/Adjust/Block. | SOFT (LLM) |
 | Cron Layer | Rate-limit recovery (60s), context checks, continue injection. | HARD (code timers) |
 
@@ -90,10 +90,14 @@ DISCUSS > PLAN > EXECUTE (per step) > VERIFY > UNIFY > ARCHIVE
 
 Execute per step:
   1. Pre-step Spine refresh
-  2. Skill Injector picks skill
+  2. Worker writes tool request
+  2a. Storekeeper reads request
+  2b. Storekeeper approves/denies
+  2c. Storekeeper injects approved tools
   3. Worker spawns with skill + mandate
   4. Worker executes
   5. Post-step Spine refresh
+  5a. Storekeeper removes tools (context cleanup)
   6. Bodyguard micro-checks [HARD]
   7. PA comparison [SOFT]
   8. Gate: pass | adjust | block

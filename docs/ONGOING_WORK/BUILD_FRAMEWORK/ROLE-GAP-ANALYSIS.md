@@ -143,42 +143,50 @@ JSON DAG (as above) for each phase transition.
 
 ---
 
-### Actor 4: SKILL INJECTOR
-**What it does:** Reads Spine + next step, matches keywords, loads ONE skill file into worker prompt.
-**Type:** Pure code (~50 lines TypeScript). NOT an LLM agent.
+### Actor 4: STOREKEEPER
+**What it does:** Receives tool requests from workers, validates against inventory (skills, MCP, plugins), approves/denies each item, injects approved tools, removes tools on step completion.
+**Type:** Pure code (~200 lines TypeScript). NOT an LLM agent.
 **Instance 3 produced:**
-- ✅ `specs/trigger-map.json` (142 triggers → 26 skills)
+- ✅ `specs/trigger-map.json` (142 triggers → 26 skills) — used as inventory catalog
 - ✅ `<!-- triggers: -->` metadata in every skill file
-**MISSING: ❌ The Skill Injector has no spec for HOW it matches.**
+**SPECIFIED: ✅ See `/docs/ONGOING_WORK/STOREKEEPER/STOREKEEPER-SPEC.md` for full specification.**
 
-trigger-map.json says skill X has triggers ["a", "b", "c"]. But:
-- Is matching exact keyword? Substring? Regex? BM25?
-- What if 2 skills match? Highest count wins? First match?
-- What if NO skill matches? Load nothing? Load a generic fallback?
-- What about the frontend design BM25 search — does that run INSIDE the injector or separately?
+The Storekeeper pattern replaces the old "code decides" Skill Injector:
 
-```markdown
-# MISSING: skill-injector-spec.md (not a skill file — a spec for Instance 4 to code)
+| Old Pattern (Skill Injector) | New Pattern (Storekeeper) |
+|------------------------------|---------------------------|
+| Code picks skill | Worker requests skill |
+| Worker receives pre-loaded | Worker receives on approval |
+| No justification required | Justification logged |
+| No denial possible | Storekeeper can deny |
+| No audit trail | Full audit trail |
 
-## Matching Algorithm
-1. Read step mandate from DAG (e.g., "Create ContactForm component with validation")
-2. Tokenize: split on spaces, lowercase, remove stopwords
-3. For each skill in trigger-map.json:
-   - Count matching triggers
-   - Score = matches / total_triggers (precision)
-4. Best match wins. Tie = first in trigger-map order.
-5. Threshold: score must be > 0.2. Below that = no skill loaded.
+**Key Storekeeper Responsibilities:**
+1. Monitor `.kenoki/requests/` for worker request files
+2. Validate requests against inventory (skills, MCP, plugins)
+3. Apply approval rules (token budget, tier limits, justification)
+4. Inject approved tools into worker context
+5. Log all checkouts to audit trail
+6. Remove tools on step completion (context cleanup)
 
-## Special Case: Frontend
-If step mandate matches frontend triggers AND project has no design system:
-  - Run BM25 search against CSV data
-  - Default query: "SaaS premium minimal clean apple whitespace"
-  - Append top 5 BM25 results to skill prompt
-
-## Output
-AgentConfig.prompt = baseWorkerPrompt + "\n\n## Skill Pre-Load\n" + matchedSkillContent
+**File Structure:**
 ```
-**ACTION: Add to `specs/` for Instance 4 to implement.**
+src/storekeeper/
+├── index.ts           # Entry point
+├── inventory.ts       # Load catalogs
+├── request-parser.ts  # Parse worker requests
+├── approval-engine.ts # Apply approval rules
+├── injector.ts        # Inject approved tools
+├── cleanup.ts         # Remove tools on completion
+└── audit.ts           # Log transactions
+
+.kenoki/
+├── requests/          # Worker request files
+├── responses/         # Storekeeper responses
+└── audit/             # Permanent audit trail
+```
+
+**STATUS: ✅ FULLY SPECIFIED — ready for Instance 4 implementation.**
 
 ---
 
