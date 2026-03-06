@@ -145,6 +145,7 @@ import {
   AppState,
   TaskUpdateEvent,
 } from './state-manager';
+import { devLog, getDevLogger } from './dev-logger';
 import {
   getTrayManager,
   cleanupTrayManager,
@@ -846,6 +847,13 @@ app.whenReady().then(() => {
     previewManager.setMainWindow(mainWindow);
   }
   console.log('[App] Preview Manager initialized');
+
+  // Initialize Developer Console (Creator View for backend visibility)
+  if (mainWindow) {
+    devLog.setMainWindow(mainWindow);
+    devLog.system('info', 'Developer Console initialized');
+  }
+  console.log('[App] Developer Console initialized');
 
   // Initialize auto-updater (Gate 12) -- skip in test mode
   if (!isTestMode) {
@@ -2916,6 +2924,28 @@ ipcMain.handle('analytics:set-enabled', async (
   } else {
     tracker.disable();
   }
+});
+
+// ============================================================================
+// IPC HANDLERS - Developer Console (Backend Visibility for Creator)
+// ============================================================================
+
+/**
+ * IPC: Check if dev console is enabled
+ */
+ipcMain.handle('dev-console:is-enabled', async (): Promise<boolean> => {
+  return getDevLogger().isEnabled();
+});
+
+/**
+ * IPC: Enable or disable dev console logging
+ */
+ipcMain.handle('dev-console:set-enabled', async (
+  _event,
+  enabled: boolean
+): Promise<void> => {
+  console.log(`[IPC] dev-console:set-enabled called: ${enabled}`);
+  getDevLogger().setEnabled(enabled);
 });
 
 // ============================================================================

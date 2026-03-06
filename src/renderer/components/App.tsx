@@ -13,6 +13,7 @@ import InstallerReassurance, { InstallerStep } from './InstallerReassurance';
 import TokenEstimate from './TokenEstimate';
 import ProjectList from './ProjectList';
 import ProjectActions from './ProjectActions';
+import { DeveloperConsole } from './DeveloperConsole';
 
 // =============================================================================
 // TYPES (Projects - Post-Build Continuation)
@@ -87,6 +88,9 @@ export default function App() {
   const [quickActions, setQuickActions] = useState<QuickAction[]>([]);
   const [hasProjects, setHasProjects] = useState(false);
 
+  // Developer console state (Cmd+Shift+D to toggle)
+  const [devModeEnabled, setDevModeEnabled] = useState(false);
+
   // Check for existing projects on mount
   useEffect(() => {
     async function checkProjects() {
@@ -99,6 +103,23 @@ export default function App() {
       }
     }
     checkProjects();
+  }, []);
+
+  // Keyboard shortcut for dev mode toggle (Cmd+Shift+D / Ctrl+Shift+D)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'd') {
+        e.preventDefault();
+        setDevModeEnabled(prev => {
+          const newState = !prev;
+          console.log(`[App] Developer console ${newState ? 'enabled' : 'disabled'}`);
+          return newState;
+        });
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
   const handleBegin = () => {
@@ -360,16 +381,38 @@ ${prompt}`;
 
   return (
     <>
-      {/* Main content with top bar padding when minimised */}
+      {/* Split-screen container when dev mode is enabled */}
       <div
         style={{
+          display: 'flex',
           width: '100%',
           height: '100%',
-          paddingTop: buildPanelState === 'minimised' ? 44 : 0,
-          transition: 'padding-top 0.2s ease-out',
         }}
       >
-        {renderContent()}
+        {/* Main content with top bar padding when minimised */}
+        <div
+          style={{
+            width: devModeEnabled ? '60%' : '100%',
+            height: '100%',
+            paddingTop: buildPanelState === 'minimised' ? 44 : 0,
+            transition: 'width 0.2s ease-out, padding-top 0.2s ease-out',
+          }}
+        >
+          {renderContent()}
+        </div>
+
+        {/* Developer Console (right split, 40% width when enabled) */}
+        {devModeEnabled && (
+          <div
+            style={{
+              width: '40%',
+              height: '100%',
+              transition: 'width 0.2s ease-out',
+            }}
+          >
+            <DeveloperConsole />
+          </div>
+        )}
       </div>
 
       {/* Top bar for minimised build state */}

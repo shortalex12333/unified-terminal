@@ -19,6 +19,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { getStateManager, StateManager } from './state-manager';
 import { conductorEvents } from './events';
+import { devLog } from './dev-logger';
 
 // ============================================================================
 // TYPES
@@ -583,6 +584,7 @@ export class Conductor extends EventEmitter {
 
     // Emit classification start event
     conductorEvents.classifyStart(message);
+    devLog.conductor('info', `Classification started`, `Message: "${message.substring(0, 100)}${message.length > 100 ? '...' : ''}"`);
 
     return new Promise((resolve, reject) => {
       // Build the classification prompt
@@ -613,6 +615,8 @@ export class Conductor extends EventEmitter {
         env: buildEnv(),
         stdio: ['pipe', 'pipe', 'pipe'],
       });
+
+      devLog.conductor('debug', `Spawned Codex for classification`, `Args: ${args.join(' ')}`);
 
       let output = '';
       let responseText = '';
@@ -658,6 +662,7 @@ export class Conductor extends EventEmitter {
             this.emit('classification-complete', plan);
             conductorEvents.classifyComplete(`plan_${Date.now()}`, plan.plan.length);
             conductorEvents.planReady(`plan_${Date.now()}`, `${plan.complexity} task with ${plan.plan.length} steps`);
+            devLog.conductor('success', `Plan created: ${plan.complexity} task`, `${plan.plan.length} steps, route: ${plan.route}`);
             resolve(plan);
           } else {
             // Fallback: create a simple web route
@@ -674,13 +679,14 @@ export class Conductor extends EventEmitter {
               }],
               estimated_minutes: 1,
             };
-            console.warn('[Conductor] Could not parse plan, using fallback');
+            devLog.conductor('warn', `Could not parse plan, using fallback`, responseText.substring(0, 200));
             resolve(fallbackPlan);
           }
         } else {
           const error = new Error(`Classification failed (code: ${code})`);
           this.emit('error', error);
           conductorEvents.error(error.message);
+          devLog.conductor('error', `Classification failed`, `Exit code: ${code}`);
           reject(error);
         }
       });
@@ -688,6 +694,7 @@ export class Conductor extends EventEmitter {
       proc.on('error', (err: Error) => {
         this.emit('error', err);
         conductorEvents.error(err.message);
+        devLog.conductor('error', `Process error`, err.message);
         reject(err);
       });
 
@@ -696,6 +703,7 @@ export class Conductor extends EventEmitter {
         proc.kill();
         const error = new Error('Classification timed out');
         this.emit('error', error);
+        devLog.conductor('error', `Classification timed out after 60s`);
         reject(error);
       }, 60000);
     });

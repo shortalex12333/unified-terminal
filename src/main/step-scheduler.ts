@@ -13,6 +13,7 @@ import { ipcMain, BrowserWindow } from 'electron';
 import * as path from 'path';
 import { schedulerEvents, checkpointEvents } from './events';
 import { getCheckpointManager, CheckpointResult } from './checkpoint-manager';
+import { devLog } from './dev-logger';
 
 // Enforcement Engine (Phase 5: 10-step flow)
 import { gateCheck, buildSpine, compareSpines } from '../enforcement';
@@ -283,6 +284,7 @@ export class StepScheduler extends EventEmitter {
    */
   async execute(plan: ExecutionPlan): Promise<PlanExecutionResult> {
     console.log(`[StepScheduler] Starting execution of plan: ${plan.planId}`);
+    devLog.scheduler('info', `Plan execution started`, `Plan: ${plan.planId}, Steps: ${plan.steps.length}`);
     const startTime = Date.now();
 
     // Emit plan start event
@@ -343,6 +345,10 @@ export class StepScheduler extends EventEmitter {
     };
 
     console.log(`[StepScheduler] Plan ${plan.planId} complete:`, result.summary);
+    devLog.scheduler(result.success ? 'success' : 'warn',
+      `Plan ${result.success ? 'completed' : 'finished with failures'}`,
+      `Done: ${result.summary.done}, Failed: ${result.summary.failed}, Skipped: ${result.summary.skipped}, Duration: ${result.durationMs}ms`
+    );
     this.emit('plan-complete', result);
     this.emitIPC('step:plan-complete', result);
 
@@ -578,6 +584,7 @@ export class StepScheduler extends EventEmitter {
     context?: Record<string, any>
   ): Promise<void> {
     console.log(`[StepScheduler] Executing step ${step.id}: ${step.action}`);
+    devLog.scheduler('info', `Step ${step.id}: ${step.action}`, step.detail);
     const projectDir = context?.projectDir || process.cwd();
 
     // Get appropriate executor
@@ -882,6 +889,7 @@ export class StepScheduler extends EventEmitter {
       step.retryCount = 0;
 
       console.log(`[StepScheduler] Step ${step.id} completed successfully (10-step flow)`);
+      devLog.scheduler('success', `Step ${step.id} done: ${step.action}`);
       this.emit('step-done', step);
       this.emitProgress(step, 100, 'Complete');
 
@@ -938,6 +946,7 @@ export class StepScheduler extends EventEmitter {
       step.error = error instanceof Error ? error.message : String(error);
 
       console.error(`[StepScheduler] Step ${step.id} failed (attempt ${step.retryCount}):`, step.error);
+      devLog.scheduler('error', `Step ${step.id} failed: ${step.action}`, `Attempt ${step.retryCount}/${MAX_RETRIES}: ${step.error}`);
 
       if (step.retryCount >= MAX_RETRIES) {
         // Circuit breaker triggered — confidence-aware action filtering
@@ -949,6 +958,7 @@ export class StepScheduler extends EventEmitter {
 
         step.status = 'needs_user';
         console.log(`[StepScheduler] Circuit breaker triggered for step ${step.id} (confidence: ${isDefinitive ? 'definitive' : 'heuristic'})`);
+        devLog.scheduler('warn', `Circuit breaker triggered`, `Step ${step.id}: ${step.error?.substring(0, 100) || 'Unknown error'}`);
         this.emit('step-needs-user', {
           step,
           actions,

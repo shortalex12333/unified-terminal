@@ -2059,4 +2059,75 @@ contextBridge.exposeInMainWorld('electronAPI', {
       };
     },
   },
+
+  // ============================================================================
+  // DEVELOPER CONSOLE METHODS (Creator View - Backend Visibility)
+  // ============================================================================
+
+  /**
+   * Developer Console API for backend visibility during staging/testing.
+   * Shows CLI processes, conductor decisions, scheduler events in real-time.
+   * Users don't see this - it's for the creator during development.
+   */
+  devConsole: {
+    /**
+     * Listen for dev log entries from backend.
+     * Receives CLI output, conductor decisions, scheduler events, etc.
+     */
+    onDevLog: (callback: (entry: {
+      source: 'cli' | 'conductor' | 'scheduler' | 'mcp' | 'system';
+      level: 'info' | 'warn' | 'error' | 'debug' | 'success';
+      message: string;
+      details?: string;
+    }) => void): (() => void) => {
+      const handler = (_event: IpcRendererEvent, entry: {
+        source: 'cli' | 'conductor' | 'scheduler' | 'mcp' | 'system';
+        level: 'info' | 'warn' | 'error' | 'debug' | 'success';
+        message: string;
+        details?: string;
+      }) => callback(entry);
+      ipcRenderer.on('dev-log', handler);
+      return () => {
+        ipcRenderer.removeListener('dev-log', handler);
+      };
+    },
+
+    /**
+     * Listen for CLI process lifecycle events.
+     * Tracks when CLI processes start and end.
+     */
+    onCliProcess: (callback: (event: {
+      action: 'start' | 'end';
+      id: string;
+      command: string;
+      pid?: number;
+      success?: boolean;
+    }) => void): (() => void) => {
+      const handler = (_event: IpcRendererEvent, event: {
+        action: 'start' | 'end';
+        id: string;
+        command: string;
+        pid?: number;
+        success?: boolean;
+      }) => callback(event);
+      ipcRenderer.on('cli-process', handler);
+      return () => {
+        ipcRenderer.removeListener('cli-process', handler);
+      };
+    },
+
+    /**
+     * Enable or disable dev console logging.
+     */
+    setEnabled: (enabled: boolean): Promise<void> => {
+      return ipcRenderer.invoke('dev-console:set-enabled', enabled);
+    },
+
+    /**
+     * Check if dev console is enabled.
+     */
+    isEnabled: (): Promise<boolean> => {
+      return ipcRenderer.invoke('dev-console:is-enabled');
+    },
+  },
 });
