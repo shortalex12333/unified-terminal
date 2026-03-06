@@ -27,7 +27,9 @@ CARL is a hard hat, not an agent. It is a mathematical counter strapped to each 
 
 The Task Spine is a two-tier checkpoint system — master spine plus per-agent sub-spines — that tracks what agents accomplished, not what files changed on disk. It is complementary to the existing file spine (`spine.ts`), not a replacement. Write isolation is enforced as a hard rail: each agent writes only to its own sub-spine, verified by the existing `check_scope.py` gate.
 
-The Project Sandbox uses a **dual topology**: a hidden agent workspace (`~/.kenoki_projects/`) for orchestration internals (spines, registries, checkpoints, CARL status) and a human-friendly output folder (`~/Documents/{Project Name}/`) with a personal ReadMe and the built product. Agents read `.md` and `.json`. Humans read the deployed output. Non-technical users never see agent internals — they see "Read Me Paula.docx" and a link to their live site. Agent scope is enforced via `cd` isolation into the hidden workspace.
+The Project Sandbox uses a **dual topology**: a hidden agent workspace (`.kenoki/` inside the project directory, like `.git/`) for orchestration internals (spines, registries, checkpoints, CARL status, tool provisioning) and a human-friendly output folder (`~/Documents/{Project Name}/`) with a personal ReadMe and the built product. Agents read `.md` and `.json`. Humans read the deployed output. Non-technical users never see agent internals — they see "Read Me Paula.docx" and a link to their live site. Agent scope is enforced via `cd` isolation into the project workspace.
+
+The **Storekeeper** is the tool provisioning clerk — agents request skills/MCPs/plugins, the storekeeper reads the task context, provisions the right tools, and removes them when no longer needed. File-based IPC via `.kenoki/requests/` and `.kenoki/responses/`. See `src/storekeeper/types.ts`.
 
 **Design philosophy:** Hardcoded for deterministic tasks (counting, comparing, injecting, scoping). AI for creative tasks (building, coding, designing). No AI in the safety-critical path.
 
@@ -111,7 +113,7 @@ export const AMBER_THRESHOLD = 0.50; // CARL transitions GREEN → AMBER at 50% 
 
 ```
 SYSTEM: Context usage at {percent}%. Write current progress summary
-to ~/.kenoki_projects/{uuid}/{domain}/subagents/{session_id}_{role}/token_hit_summary.md
+to ~/.kenoki/{uuid}/{domain}/subagents/{session_id}_{role}/token_hit_summary.md
 using this format:
 
 ## Checkpoint | {percent}% context | {timestamp}
@@ -129,7 +131,7 @@ CARL fills `{percent}`, `{project_dir}`, `{domain}`, `{session_id}`, `{role}`, a
 
 ```
 SYSTEM: Context limit reached at {percent}%. Write FINAL state to
-~/.kenoki_projects/{uuid}/{domain}/subagents/{session_id}_{role}/token_hit_summary.md
+~/.kenoki/{uuid}/{domain}/subagents/{session_id}_{role}/token_hit_summary.md
 and conclude your work. Do not start new tasks. Finish current atomic
 unit and stop.
 
@@ -182,7 +184,7 @@ CARL is a memory pressure relief valve for each CLI process.
 |-----------|--------|-------------|
 | **Reads from** | `AgentHandle.onOutput` | Streaming character count for real-time estimation |
 | **Reads from** | `AgentResult.tokensUsed` | Post-completion exact tokens for reconciliation |
-| **Writes to** | `~/.kenoki_projects/{uuid}/status/agent_{id}.json` | Agent status file on state transitions |
+| **Writes to** | `~/.kenoki/{uuid}/status/agent_{id}.json` | Agent status file on state transitions |
 | **Injects into** | CLI stdin | Hardcoded checkpoint/final-state templates |
 | **Checked by** | Bodyguard gate | File-existence check on checkpoint files |
 | **Displayed by** | Status Agent translator | `context-warden:checkpoint` and `context-warden:kill` events (already defined at `translator.ts:366-388`) |
@@ -286,11 +288,11 @@ The project sandbox has **two** directory structures per project: a hidden agent
 
 ### 4.1 Hidden Agent Workspace
 
-This is the agent-only workspace. Users never need to open this. Hidden by dot-prefix convention.
+This is the agent-only workspace, stored as `.kenoki/` inside the project directory — same pattern as `.git/`. Users never need to open this. Hidden by dot-prefix convention. The constant `STOREKEEPER_CONSTANTS.KENOKI_DIR` (from `src/storekeeper/types.ts`) defines this name.
 
 ```
-~/.kenoki_projects/
-├── {project_uuid}/                            ← orchestrator scope boundary
+{project_dir}/
+├── .kenoki/                                   ← hidden workspace (like .git/)
 │   ├── agent_registry.json                    ← project-level: all agents, roles, status
 │   ├── spine_master.md                        ← master orchestrator writes ONLY
 │   ├── project_brief.md                       ← intake output, immutable after creation
@@ -299,6 +301,14 @@ This is the agent-only workspace. Users never need to open this. Hidden by dot-p
 │   │   ├── agent_{id_1}.json
 │   │   ├── agent_{id_2}.json
 │   │   └── ...
+│   │
+│   ├── requests/                              ← storekeeper IPC: tool requests from agents
+│   ├── responses/                             ← storekeeper IPC: provisioning decisions
+│   ├── audit/                                 ← storekeeper: decision audit trail
+│   ├── inventory/                             ← storekeeper: available tools/skills/MCPs
+│   │
+│   ├── registry/                              ← agent registry (used by enforcement/registry.ts)
+│   │   └── agents.json
 │   │
 │   ├── skills/
 │   │   ├── active_mcps.json
@@ -321,7 +331,9 @@ This is the agent-only workspace. Users never need to open this. Hidden by dot-p
 │   │
 │   └── {domain}/                              ← repeat per domain
 │
-└── {project_uuid}/                            ← next project
+├── src/                                       ← actual project source code
+├── package.json
+└── ...
 ```
 
 ### 4.2 Human-Friendly Output Folder
@@ -366,14 +378,14 @@ The `{deployment_url}` links to the live deployed output — Vercel preview, Sho
 
 ### 4.3 Two Structures, One Truth
 
-| Concern | Agent Workspace (`~/.kenoki_projects/`) | Human Output (`~/Documents/{Name}/`) |
+| Concern | Agent Workspace (`.kenoki/`) | Human Output (`~/Documents/{Name}/`) |
 |---------|----------------------------------------|--------------------------------------|
-| **Audience** | Agents, orchestrator, CARL, PA | The user (non-technical) |
-| **Contents** | Spine files, registries, checkpoints, status JSON | ReadMe + project source files |
-| **Naming** | UUID-based (machine-readable) | Project name (human-readable) |
-| **Hidden?** | Yes (dot-prefix) | No (in Documents) |
-| **Who writes?** | Agents (write-isolated per scope) | Agents (via build pipeline) |
-| **Who reads?** | Orchestrator, PA, CARL, bodyguard | The user |
+| **Audience** | Agents, orchestrator, CARL, PA, storekeeper | The user (non-technical) |
+| **Contents** | Spine files, registries, checkpoints, status JSON, tool requests/responses | ReadMe + project source files |
+| **Location** | `{project_dir}/.kenoki/` (hidden, like `.git/`) | `~/Documents/{Project Name}/` |
+| **Hidden?** | Yes (dot-prefix inside project dir) | No (in Documents) |
+| **Who writes?** | Agents (write-isolated per scope), storekeeper (tool provisioning) | Agents (via build pipeline) |
+| **Who reads?** | Orchestrator, PA, CARL, bodyguard, storekeeper | The user |
 | **Format** | `.md`, `.json`, `.txt` | `.docx` (ReadMe), source code (in /Files) |
 
 **Linking:** The agent workspace stores a `human_output_path` field in `project_brief.md` pointing to the human folder. The human ReadMe does NOT link back to the agent workspace — users never need to see it.
@@ -392,24 +404,25 @@ The orchestrator emits `worker:complete` (agent-facing) and the PA emits `pa:han
 ### 4.5 Spawn Command Template
 
 ```bash
-cd ~/.kenoki_projects/{{ project_uuid }}/{{ domain }}/subagents/{{ session_id }}_{{ role }} && {{ runtime }}
+cd {{ project_dir }}/.kenoki/{{ domain }}/subagents/{{ session_id }}_{{ role }} && {{ runtime }}
 ```
 
 - Sub-agent sees ONLY its folder (sandbox = working directory)
-- Domain orchestrator launches from `{domain}/` (sees all subagents in its domain)
-- Master orchestrator launches from `{project_uuid}/` (sees all domains)
-- NEVER launch from `~/.kenoki_projects/` (would see all projects — scope violation)
+- Domain orchestrator launches from `.kenoki/{domain}/` (sees all subagents in its domain)
+- Master orchestrator launches from `.kenoki/` (sees all domains)
+- Project source code lives alongside `.kenoki/` in the project directory
 
 ### 4.6 Scaffold Creation (Three-Phase, Hardcoded)
 
 **Phase 1 — Intake:** Create both structures.
 
 ```bash
-# Agent workspace
-mkdir -p ~/.kenoki_projects/{uuid}/{status,skills,pa}
-# Write: agent_registry.json (empty schema)
-# Write: project_brief.md (from intake, includes human_output_path)
-# Write: spine_master.md (header only)
+# Agent workspace (project-local .kenoki/)
+mkdir -p {project_dir}/.kenoki/{status,skills,pa,requests,responses,audit,inventory,registry}
+# Write: .kenoki/agent_registry.json (empty schema)
+# Write: .kenoki/project_brief.md (from intake, includes human_output_path)
+# Write: .kenoki/spine_master.md (header only)
+# Write: .kenoki/registry/agents.json (empty agent list)
 
 # Human output
 mkdir -p ~/Documents/{project_name}/Files
@@ -419,9 +432,9 @@ mkdir -p ~/Documents/{project_name}/Files
 **Phase 2 — Conductor classification:** Add domain folders to agent workspace.
 
 ```bash
-mkdir -p ~/.kenoki_projects/{uuid}/{domain}/subagents
-# Write: {domain}/agent_registry.json (empty schema)
-# Write: {domain}/sub_agent_spine.md (header only)
+mkdir -p {project_dir}/.kenoki/{domain}/subagents
+# Write: .kenoki/{domain}/agent_registry.json (empty schema)
+# Write: .kenoki/{domain}/sub_agent_spine.md (header only)
 ```
 
 **Phase 3 — Build complete:** Copy/build output to human folder.
@@ -606,10 +619,19 @@ ENFORCEMENT LAYER (all deterministic, zero AI)
     ├── {domain}/sub_agent_spine.md  ← domain orchestrator writes only
     └── {domain}/subagents/{id}/token_hit_summary.md  ← agent writes only
 
+PROVISIONING LAYER (deterministic IPC, file-based)
+│
+└── STOREKEEPER (tool clerk — src/storekeeper/)
+    ├── Reads: agent task context from .kenoki/requests/
+    ├── Writes: provisioning decisions to .kenoki/responses/
+    ├── Manages: skill/MCP/plugin inventory in .kenoki/inventory/
+    ├── Audits: all decisions to .kenoki/audit/
+    └── Hard limits: MAX_SKILLS_ABSOLUTE=5, MAX_SKILL_TOKENS=4000
+
 INTELLIGENCE LAYER (AI, reads from deterministic sources)
 │
 ├── PA → reads sub-spines → spots patterns → notifies user
-├── SKILL SELECTOR → reads sub-spines → injects relevant skills
+├── SKILL SELECTOR → reads task context → requests tools via storekeeper
 └── ORCHESTRATOR → reads sub-spines → makes launch/kill/replace decisions
 ```
 
@@ -771,7 +793,7 @@ Orchestrator    CARL         Agent         Bodyguard    Status Agent
 - **Implementation code** — This is a specification document. Implementation follows approval.
 - **UI design for fuel gauge** — Frontend work is deferred per project rules.
 - **Multi-machine orchestration** — Single machine only for now.
-- **Windows/Linux paths** — macOS only (`~/.kenoki/`) until cross-platform is needed.
+- **Windows/Linux paths** — macOS only (project-local `.kenoki/`) until cross-platform is needed.
 - **Encryption of status files** — Status files contain operational metadata, not secrets.
 
 ---
