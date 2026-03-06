@@ -34,9 +34,10 @@ const PROVIDERS: ProviderProfile[] = [
 
 interface Props {
   onSelectProvider: (state: ProviderState) => void;
+  initialPrompt?: string | null;
 }
 
-export default function ProfilePicker({ onSelectProvider }: Props) {
+export default function ProfilePicker({ onSelectProvider, initialPrompt }: Props) {
   const [selectedProvider, setSelectedProvider] = useState<Provider | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -83,12 +84,58 @@ export default function ProfilePicker({ onSelectProvider }: Props) {
           fontSize: 24,
           color: 'var(--kenoki-text)',
           margin: 0,
-          marginBottom: 48,
+          marginBottom: initialPrompt ? 16 : 48,
         }}
       >
         Select your app, and{' '}
         <span style={{ color: 'var(--kenoki-accent)' }}>login</span>
       </p>
+
+      {/* Show selected prompt if available */}
+      {initialPrompt && (
+        <div
+          style={{
+            maxWidth: 480,
+            padding: '12px 20px',
+            marginBottom: 32,
+            background: 'var(--kenoki-surface)',
+            borderRadius: 'var(--kenoki-radius-md)',
+            border: '1px solid var(--kenoki-border)',
+            textAlign: 'center',
+          }}
+        >
+          <p
+            style={{
+              fontSize: 12,
+              fontWeight: 500,
+              fontFamily: "'Poppins', sans-serif",
+              color: 'var(--kenoki-text-muted)',
+              margin: 0,
+              marginBottom: 6,
+              textTransform: 'uppercase',
+              letterSpacing: '0.5px',
+            }}
+          >
+            Your project
+          </p>
+          <p
+            style={{
+              fontSize: 14,
+              fontWeight: 400,
+              fontFamily: "'Poppins', sans-serif",
+              color: 'var(--kenoki-text)',
+              margin: 0,
+              lineHeight: 1.5,
+              display: '-webkit-box',
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: 'vertical',
+              overflow: 'hidden',
+            }}
+          >
+            {initialPrompt}
+          </p>
+        </div>
+      )}
 
       {/* Provider cards */}
       <div style={{ display: 'flex', gap: 48 }}>

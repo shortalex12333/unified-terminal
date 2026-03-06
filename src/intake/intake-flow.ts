@@ -33,6 +33,7 @@ import {
   isBriefComplete,
 } from './brief-builder';
 import { classifyTask } from './task-classifier';
+import { getAnalyticsTracker } from '../main/analytics';
 
 // ============================================================================
 // SESSION MANAGEMENT
@@ -137,7 +138,15 @@ function handleInitialPhase(
 /**
  * Handle skip flow - user wants to skip intake.
  */
-function handleSkipFlow(state: IntakeState): ProcessResult {
+function handleSkipFlow(state: IntakeState, questionIndex?: number): ProcessResult {
+  // Track the skipped question for analytics
+  const tracker = getAnalyticsTracker();
+  const questionCount = state.messages.filter(m => m.role === 'assistant').length;
+  tracker.trackIntakeQuestionSkipped({
+    question: state.messages[state.messages.length - 1]?.content || 'intake_flow',
+    questionIndex: questionIndex ?? questionCount,
+  });
+
   const skipPrompt = buildSkipFlowPrompt(state.originalRequest);
 
   const newState: IntakeState = {

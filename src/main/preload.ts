@@ -1191,4 +1191,872 @@ contextBridge.exposeInMainWorld('electronAPI', {
       return ipcRenderer.invoke('shell:open-external', url);
     },
   },
+
+  // ============================================================================
+  // PREVIEW METHODS (Live Preview Panel)
+  // ============================================================================
+
+  /**
+   * Preview API for live preview of dev servers
+   */
+  preview: {
+    /**
+     * Show preview panel with the given URL
+     * @param url - The URL to display in preview (e.g., http://localhost:3000)
+     */
+    show: (url: string): Promise<{ success: boolean; error?: string }> => {
+      return ipcRenderer.invoke('preview:show', url);
+    },
+
+    /**
+     * Hide the preview panel
+     */
+    hide: (): Promise<{ success: boolean }> => {
+      return ipcRenderer.invoke('preview:hide');
+    },
+
+    /**
+     * Refresh the preview panel
+     */
+    refresh: (): Promise<{ success: boolean; error?: string }> => {
+      return ipcRenderer.invoke('preview:refresh');
+    },
+
+    /**
+     * Auto-detect running dev server on common ports (3000, 5173, 8080, 4000, etc.)
+     */
+    detectServer: (): Promise<{
+      found: boolean;
+      port?: number;
+      url?: string;
+      checkedPorts: number[];
+    }> => {
+      return ipcRenderer.invoke('preview:detect-server');
+    },
+
+    /**
+     * Set preview port (shorthand for show with localhost URL)
+     * @param port - The port number
+     */
+    setPort: (port: number): Promise<{ success: boolean; error?: string }> => {
+      return ipcRenderer.invoke('preview:set-port', port);
+    },
+
+    /**
+     * Get preview configuration
+     */
+    getConfig: (): Promise<{
+      url: string;
+      port: number;
+      visible: boolean;
+      autoRefresh: boolean;
+      refreshDebounce: number;
+    }> => {
+      return ipcRenderer.invoke('preview:get-config');
+    },
+
+    /**
+     * Set auto-refresh enabled/disabled
+     */
+    setAutoRefresh: (enabled: boolean): Promise<void> => {
+      return ipcRenderer.invoke('preview:set-auto-refresh', enabled);
+    },
+
+    /**
+     * Navigate to a new URL in preview
+     */
+    navigate: (url: string): Promise<{ success: boolean; error?: string }> => {
+      return ipcRenderer.invoke('preview:navigate', url);
+    },
+
+    /**
+     * Check if preview is visible
+     */
+    isVisible: (): Promise<boolean> => {
+      return ipcRenderer.invoke('preview:is-visible');
+    },
+
+    /**
+     * Get current preview URL
+     */
+    getUrl: (): Promise<string> => {
+      return ipcRenderer.invoke('preview:get-url');
+    },
+
+    // -------------------------------------------------------------------------
+    // Event Listeners
+    // -------------------------------------------------------------------------
+
+    /**
+     * Listen for preview shown event
+     */
+    onShown: (callback: (data: { url: string; port: number }) => void): (() => void) => {
+      const handler = (_event: IpcRendererEvent, data: { url: string; port: number }) => callback(data);
+      ipcRenderer.on('preview:shown', handler);
+      return () => {
+        ipcRenderer.removeListener('preview:shown', handler);
+      };
+    },
+
+    /**
+     * Listen for preview hidden event
+     */
+    onHidden: (callback: () => void): (() => void) => {
+      const handler = () => callback();
+      ipcRenderer.on('preview:hidden', handler);
+      return () => {
+        ipcRenderer.removeListener('preview:hidden', handler);
+      };
+    },
+
+    /**
+     * Listen for preview refreshed event
+     */
+    onRefreshed: (callback: (data: { url: string }) => void): (() => void) => {
+      const handler = (_event: IpcRendererEvent, data: { url: string }) => callback(data);
+      ipcRenderer.on('preview:refreshed', handler);
+      return () => {
+        ipcRenderer.removeListener('preview:refreshed', handler);
+      };
+    },
+
+    /**
+     * Listen for preview loaded event
+     */
+    onLoaded: (callback: (data: { url: string }) => void): (() => void) => {
+      const handler = (_event: IpcRendererEvent, data: { url: string }) => callback(data);
+      ipcRenderer.on('preview:loaded', handler);
+      return () => {
+        ipcRenderer.removeListener('preview:loaded', handler);
+      };
+    },
+
+    /**
+     * Listen for preview load error event
+     */
+    onLoadError: (callback: (data: { errorCode: number; errorDescription: string; url: string }) => void): (() => void) => {
+      const handler = (_event: IpcRendererEvent, data: { errorCode: number; errorDescription: string; url: string }) => callback(data);
+      ipcRenderer.on('preview:load-error', handler);
+      return () => {
+        ipcRenderer.removeListener('preview:load-error', handler);
+      };
+    },
+
+    /**
+     * Listen for preview navigated event
+     */
+    onNavigated: (callback: (data: { url: string }) => void): (() => void) => {
+      const handler = (_event: IpcRendererEvent, data: { url: string }) => callback(data);
+      ipcRenderer.on('preview:navigated', handler);
+      return () => {
+        ipcRenderer.removeListener('preview:navigated', handler);
+      };
+    },
+  },
+
+  // ============================================================================
+  // PROJECTS METHODS (Post-Build Continuation)
+  // ============================================================================
+
+  /**
+   * Projects API for managing user projects.
+   * Enables returning to and iterating on previously built projects.
+   */
+  projects: {
+    /**
+     * List all projects, optionally filtered by status.
+     * @param status - Optional status filter ('active' | 'archived')
+     * @returns Array of projects sorted by lastModifiedAt
+     */
+    list: (status?: 'active' | 'archived'): Promise<{
+      id: string;
+      name: string;
+      path: string;
+      createdAt: string;
+      lastModifiedAt: string;
+      template?: string;
+      description: string;
+      thumbnail?: string;
+      status: 'active' | 'archived';
+    }[]> => {
+      return ipcRenderer.invoke('projects:list', status);
+    },
+
+    /**
+     * Get a project by ID.
+     * @param id - Project ID
+     * @returns Project or null if not found
+     */
+    get: (id: string): Promise<{
+      id: string;
+      name: string;
+      path: string;
+      createdAt: string;
+      lastModifiedAt: string;
+      template?: string;
+      description: string;
+      thumbnail?: string;
+      status: 'active' | 'archived';
+    } | null> => {
+      return ipcRenderer.invoke('projects:get', id);
+    },
+
+    /**
+     * Create a new project.
+     * @param data - Project creation data
+     * @returns Operation result with success status
+     */
+    create: (data: {
+      name: string;
+      path: string;
+      template?: string;
+      description: string;
+    }): Promise<{
+      success: boolean;
+      error?: string;
+      project?: {
+        id: string;
+        name: string;
+        path: string;
+        createdAt: string;
+        lastModifiedAt: string;
+        template?: string;
+        description: string;
+        thumbnail?: string;
+        status: 'active' | 'archived';
+      };
+    }> => {
+      return ipcRenderer.invoke('projects:create', data);
+    },
+
+    /**
+     * Update a project.
+     * @param id - Project ID
+     * @param updates - Partial update data
+     * @returns Operation result with success status
+     */
+    update: (id: string, updates: {
+      name?: string;
+      description?: string;
+      template?: string;
+      thumbnail?: string;
+      status?: 'active' | 'archived';
+    }): Promise<{
+      success: boolean;
+      error?: string;
+    }> => {
+      return ipcRenderer.invoke('projects:update', id, updates);
+    },
+
+    /**
+     * Archive a project (soft delete).
+     * @param id - Project ID
+     * @returns Operation result with success status
+     */
+    archive: (id: string): Promise<{
+      success: boolean;
+      error?: string;
+    }> => {
+      return ipcRenderer.invoke('projects:archive', id);
+    },
+
+    /**
+     * Search projects by name or description.
+     * @param query - Search query string
+     * @returns Array of matching projects
+     */
+    search: (query: string): Promise<{
+      id: string;
+      name: string;
+      path: string;
+      createdAt: string;
+      lastModifiedAt: string;
+      template?: string;
+      description: string;
+      thumbnail?: string;
+      status: 'active' | 'archived';
+    }[]> => {
+      return ipcRenderer.invoke('projects:search', query);
+    },
+
+    /**
+     * Get recently modified projects.
+     * @param limit - Maximum number of projects (default: 5)
+     * @returns Array of recent projects
+     */
+    recent: (limit?: number): Promise<{
+      id: string;
+      name: string;
+      path: string;
+      createdAt: string;
+      lastModifiedAt: string;
+      template?: string;
+      description: string;
+      thumbnail?: string;
+      status: 'active' | 'archived';
+    }[]> => {
+      return ipcRenderer.invoke('projects:recent', limit);
+    },
+
+    /**
+     * Open a project for continuation work.
+     * Updates lastModifiedAt and returns project with quick actions.
+     * @param id - Project ID
+     * @returns Project with available quick actions
+     */
+    open: (id: string): Promise<{
+      project: {
+        id: string;
+        name: string;
+        path: string;
+        createdAt: string;
+        lastModifiedAt: string;
+        template?: string;
+        description: string;
+        thumbnail?: string;
+        status: 'active' | 'archived';
+      } | null;
+      quickActions: Array<{
+        type: string;
+        label: string;
+        icon: string;
+        promptTemplate: string;
+        description: string;
+      }>;
+    }> => {
+      return ipcRenderer.invoke('projects:open', id);
+    },
+
+    /**
+     * Get default quick actions for project continuation.
+     * @returns Array of quick actions
+     */
+    getQuickActions: (): Promise<Array<{
+      type: string;
+      label: string;
+      icon: string;
+      promptTemplate: string;
+      description: string;
+    }>> => {
+      return ipcRenderer.invoke('projects:quick-actions');
+    },
+
+    /**
+     * Open project folder in Finder/Explorer.
+     * @param id - Project ID
+     * @returns True if opened successfully
+     */
+    openFolder: (id: string): Promise<boolean> => {
+      return ipcRenderer.invoke('projects:open-folder', id);
+    },
+
+    /**
+     * Cleanup orphaned projects whose directories no longer exist.
+     * @returns Number of projects removed
+     */
+    cleanup: (): Promise<number> => {
+      return ipcRenderer.invoke('projects:cleanup');
+    },
+  },
+
+  // ============================================================================
+  // ANALYTICS METHODS (Local Telemetry)
+  // ============================================================================
+
+  /**
+   * Analytics API for local, anonymous telemetry.
+   * All data stays on the user's device - NO cloud, NO tracking.
+   */
+  analytics: {
+    /**
+     * Get aggregated analytics summary.
+     * Returns statistics about builds, success rates, etc.
+     */
+    getSummary: (): Promise<{
+      totalBuilds: number;
+      completedBuilds: number;
+      cancelledBuilds: number;
+      averageBuildTime: number;
+      tierUsage: { tier0: number; tier1: number; tier2: number; tier3: number };
+      topTemplates: string[];
+      commonCancelPoints: string[];
+      successRate: number;
+      totalBuildTime: number;
+      firstEventAt: number | null;
+      lastEventAt: number | null;
+    }> => {
+      return ipcRenderer.invoke('analytics:get-summary');
+    },
+
+    /**
+     * Export all analytics data as JSON string.
+     * Users can see exactly what data is stored.
+     */
+    export: (): Promise<string> => {
+      return ipcRenderer.invoke('analytics:export');
+    },
+
+    /**
+     * Clear all analytics data.
+     * Removes all stored events permanently.
+     */
+    clear: (): Promise<void> => {
+      return ipcRenderer.invoke('analytics:clear');
+    },
+
+    /**
+     * Check if analytics tracking is enabled.
+     */
+    isEnabled: (): Promise<boolean> => {
+      return ipcRenderer.invoke('analytics:is-enabled');
+    },
+
+    /**
+     * Enable or disable analytics tracking.
+     */
+    setEnabled: (enabled: boolean): Promise<void> => {
+      return ipcRenderer.invoke('analytics:set-enabled', enabled);
+    },
+  },
+
+  // ============================================================================
+  // MCP METHODS (Model Context Protocol Account Connection)
+  // ============================================================================
+
+  /**
+   * MCP API for managing external service connections.
+   * Provides just-in-time OAuth for services like Stripe, GitHub, Vercel.
+   */
+  mcp: {
+    /**
+     * List all available MCP servers.
+     * @returns Array of MCPServer objects with connection status
+     */
+    listServers: (): Promise<Array<{
+      id: string;
+      name: string;
+      description: string;
+      icon: string;
+      oauthUrl?: string;
+      tokenUrl?: string;
+      requiredScopes: string[];
+      status: 'disconnected' | 'connecting' | 'connected' | 'error';
+      errorMessage?: string;
+      requiresOAuth: boolean;
+      category: string;
+      docsUrl?: string;
+    }>> => {
+      return ipcRenderer.invoke('mcp:list-servers');
+    },
+
+    /**
+     * Get a specific MCP server by ID.
+     * @param serverId - Server ID to look up
+     * @returns Server object or null
+     */
+    getServer: (serverId: string): Promise<{
+      id: string;
+      name: string;
+      description: string;
+      icon: string;
+      status: 'disconnected' | 'connecting' | 'connected' | 'error';
+      requiresOAuth: boolean;
+      category: string;
+    } | null> => {
+      return ipcRenderer.invoke('mcp:get-server', serverId);
+    },
+
+    /**
+     * Connect to an MCP server (initiates OAuth or API key flow).
+     * @param serverId - Server ID to connect
+     * @param options - Optional connection options
+     * @returns Connection result
+     */
+    connect: (serverId: string, options?: {
+      force?: boolean;
+      timeout?: number;
+    }): Promise<{
+      success: boolean;
+      serverId: string;
+      error?: string;
+      connection?: {
+        serverId: string;
+        connectedAt: Date;
+        expiresAt?: Date;
+      };
+    }> => {
+      return ipcRenderer.invoke('mcp:connect', serverId, options);
+    },
+
+    /**
+     * Set API key for a non-OAuth MCP server.
+     * @param serverId - Server ID
+     * @param apiKey - API key to set
+     * @returns Connection result
+     */
+    setApiKey: (serverId: string, apiKey: string): Promise<{
+      success: boolean;
+      serverId: string;
+      error?: string;
+    }> => {
+      return ipcRenderer.invoke('mcp:set-api-key', serverId, apiKey);
+    },
+
+    /**
+     * Disconnect from an MCP server.
+     * @param serverId - Server ID to disconnect
+     * @param options - Optional disconnect options
+     * @returns Disconnect result
+     */
+    disconnect: (serverId: string, options?: {
+      revokeToken?: boolean;
+    }): Promise<{
+      success: boolean;
+      serverId: string;
+      error?: string;
+    }> => {
+      return ipcRenderer.invoke('mcp:disconnect', serverId, options);
+    },
+
+    /**
+     * Check if an MCP server is connected.
+     * @param serverId - Server ID to check
+     * @returns True if connected
+     */
+    isConnected: (serverId: string): Promise<boolean> => {
+      return ipcRenderer.invoke('mcp:is-connected', serverId);
+    },
+
+    /**
+     * Get connection for an MCP server.
+     * @param serverId - Server ID
+     * @returns Connection object or null
+     */
+    getConnection: (serverId: string): Promise<{
+      serverId: string;
+      connectedAt: Date;
+      expiresAt?: Date;
+      userInfo?: {
+        id?: string;
+        email?: string;
+        name?: string;
+        avatar?: string;
+      };
+    } | null> => {
+      return ipcRenderer.invoke('mcp:get-connection', serverId);
+    },
+
+    /**
+     * Get all active MCP connections.
+     * @returns Array of connection objects
+     */
+    getConnections: (): Promise<Array<{
+      serverId: string;
+      connectedAt: Date;
+      expiresAt?: Date;
+    }>> => {
+      return ipcRenderer.invoke('mcp:get-connections');
+    },
+
+    /**
+     * Check required MCP servers for a step.
+     * Used to detect if an action needs external service connections.
+     * @param stepAction - Step action name
+     * @param stepDetail - Step detail/description
+     * @returns Detection result with required servers
+     */
+    checkRequired: (stepAction: string, stepDetail: string): Promise<{
+      requirements: Array<{
+        serverId: string;
+        reason: string;
+        required: boolean;
+        features?: string[];
+      }>;
+      missingRequired: Array<{
+        serverId: string;
+        reason: string;
+        required: boolean;
+      }>;
+      missingOptional: Array<{
+        serverId: string;
+        reason: string;
+        required: boolean;
+      }>;
+      canProceed: boolean;
+    }> => {
+      return ipcRenderer.invoke('mcp:check-required', stepAction, stepDetail);
+    },
+
+    /**
+     * Verify an MCP connection is still valid.
+     * @param serverId - Server ID to verify
+     * @returns True if connection is valid
+     */
+    verifyConnection: (serverId: string): Promise<boolean> => {
+      return ipcRenderer.invoke('mcp:verify-connection', serverId);
+    },
+
+    /**
+     * Refresh access token for an MCP server.
+     * @param serverId - Server ID to refresh
+     * @returns True if refresh succeeded
+     */
+    refreshToken: (serverId: string): Promise<boolean> => {
+      return ipcRenderer.invoke('mcp:refresh-token', serverId);
+    },
+
+    // -------------------------------------------------------------------------
+    // Event Listeners
+    // -------------------------------------------------------------------------
+
+    /**
+     * Listen for MCP status changes.
+     * @param callback - Called when server status changes
+     * @returns Cleanup function
+     */
+    onStatusChange: (callback: (event: {
+      serverId: string;
+      previousStatus: 'disconnected' | 'connecting' | 'connected' | 'error';
+      newStatus: 'disconnected' | 'connecting' | 'connected' | 'error';
+      errorMessage?: string;
+    }) => void): (() => void) => {
+      const handler = (_event: IpcRendererEvent, data: any) => callback(data);
+      ipcRenderer.on('mcp:status-change', handler);
+      return () => {
+        ipcRenderer.removeListener('mcp:status-change', handler);
+      };
+    },
+
+    /**
+     * Listen for MCP connection added.
+     * @param callback - Called when a new connection is established
+     * @returns Cleanup function
+     */
+    onConnectionAdded: (callback: (connection: {
+      serverId: string;
+      connectedAt: Date;
+    }) => void): (() => void) => {
+      const handler = (_event: IpcRendererEvent, data: any) => callback(data);
+      ipcRenderer.on('mcp:connection-added', handler);
+      return () => {
+        ipcRenderer.removeListener('mcp:connection-added', handler);
+      };
+    },
+
+    /**
+     * Listen for MCP connection removed.
+     * @param callback - Called when a connection is removed
+     * @returns Cleanup function
+     */
+    onConnectionRemoved: (callback: (serverId: string) => void): (() => void) => {
+      const handler = (_event: IpcRendererEvent, serverId: string) => callback(serverId);
+      ipcRenderer.on('mcp:connection-removed', handler);
+      return () => {
+        ipcRenderer.removeListener('mcp:connection-removed', handler);
+      };
+    },
+
+    /**
+     * Listen for MCP connection errors.
+     * @param callback - Called when a connection error occurs
+     * @returns Cleanup function
+     */
+    onConnectionError: (callback: (data: {
+      serverId: string;
+      error: string;
+    }) => void): (() => void) => {
+      const handler = (_event: IpcRendererEvent, data: any) => callback(data);
+      ipcRenderer.on('mcp:connection-error', handler);
+      return () => {
+        ipcRenderer.removeListener('mcp:connection-error', handler);
+      };
+    },
+
+    /**
+     * Listen for MCP connection required during build.
+     * Called by step-scheduler when a step needs MCP connections.
+     * @param callback - Called when MCP connection is required
+     * @returns Cleanup function
+     */
+    onConnectionRequired: (callback: (event: {
+      stepId: number;
+      stepAction: string;
+      stepDetail: string;
+      detection: {
+        requirements: Array<{
+          serverId: string;
+          reason: string;
+          required: boolean;
+        }>;
+        missingRequired: Array<{
+          serverId: string;
+          reason: string;
+          required: boolean;
+        }>;
+        canProceed: boolean;
+      };
+    }) => void): (() => void) => {
+      const handler = (_event: IpcRendererEvent, data: any) => callback(data);
+      ipcRenderer.on('mcp:connection-required', handler);
+      return () => {
+        ipcRenderer.removeListener('mcp:connection-required', handler);
+      };
+    },
+  },
+
+  // ============================================================================
+  // FAILURE METHODS (Graceful Failure UX)
+  // ============================================================================
+
+  /**
+   * Failure API for handling build failures gracefully.
+   * Saves progress when builds fail and allows users to resume later.
+   */
+  failure: {
+    /**
+     * Save current build progress when a failure occurs.
+     */
+    saveProgress: (params: {
+      planId: string;
+      projectPath: string;
+      projectName: string;
+      failedStepId: number;
+      error: string;
+      statusCode?: number;
+      originalMessage?: string;
+      context?: Record<string, unknown>;
+    }): Promise<any> => {
+      return ipcRenderer.invoke('failure:save-progress', params);
+    },
+
+    /**
+     * List all saved progress entries.
+     */
+    listSaved: (): Promise<any[]> => {
+      return ipcRenderer.invoke('failure:list-saved');
+    },
+
+    /**
+     * Load a specific saved progress.
+     */
+    load: (id: string): Promise<any | null> => {
+      return ipcRenderer.invoke('failure:load', id);
+    },
+
+    /**
+     * Delete a saved progress.
+     */
+    delete: (id: string): Promise<boolean> => {
+      return ipcRenderer.invoke('failure:delete', id);
+    },
+
+    /**
+     * Check if saved progress can be resumed.
+     */
+    canResume: (id: string): Promise<boolean> => {
+      return ipcRenderer.invoke('failure:can-resume', id);
+    },
+
+    /**
+     * Resume from saved progress.
+     */
+    resume: (id: string, options?: {
+      fromFailedStep?: boolean;
+      skipFailedStep?: boolean;
+      regeneratePlan?: boolean;
+      tryDifferentApproach?: boolean;
+    }): Promise<{
+      success: boolean;
+      newPlanId?: string;
+      error?: string;
+      resumedFromStep?: number;
+    }> => {
+      return ipcRenderer.invoke('failure:resume', id, options);
+    },
+
+    /**
+     * Download partial outputs as a zip file.
+     */
+    downloadPartial: (id: string, options?: {
+      completeOnly?: boolean;
+      includeSources?: boolean;
+      format?: 'zip' | 'tar.gz';
+      filename?: string;
+    }): Promise<{
+      success: boolean;
+      filePath?: string;
+      size?: number;
+      fileCount?: number;
+      error?: string;
+    }> => {
+      return ipcRenderer.invoke('failure:download-partial', id, options);
+    },
+
+    /**
+     * Open the downloads directory in Finder.
+     */
+    openDownloads: (): Promise<{ success: boolean }> => {
+      return ipcRenderer.invoke('failure:open-downloads');
+    },
+
+    /**
+     * Get failure modal data for UI display.
+     */
+    getModalData: (id: string): Promise<any | null> => {
+      return ipcRenderer.invoke('failure:get-modal-data', id);
+    },
+
+    /**
+     * Cleanup old saved progress files.
+     */
+    cleanup: (maxAgeMs?: number): Promise<number> => {
+      return ipcRenderer.invoke('failure:cleanup', maxAgeMs);
+    },
+
+    /**
+     * Listen for progress saved events.
+     */
+    onProgressSaved: (callback: (progress: any) => void): (() => void) => {
+      const handler = (_event: IpcRendererEvent, progress: any) => callback(progress);
+      ipcRenderer.on('failure:progress-saved', handler);
+      return () => {
+        ipcRenderer.removeListener('failure:progress-saved', handler);
+      };
+    },
+
+    /**
+     * Listen for progress deleted events.
+     */
+    onProgressDeleted: (callback: (id: string) => void): (() => void) => {
+      const handler = (_event: IpcRendererEvent, id: string) => callback(id);
+      ipcRenderer.on('failure:progress-deleted', handler);
+      return () => {
+        ipcRenderer.removeListener('failure:progress-deleted', handler);
+      };
+    },
+
+    /**
+     * Listen for build failure events (triggers FailureModal).
+     * Emitted when a build fails and progress is automatically saved.
+     */
+    onBuildFailed: (callback: (data: {
+      progressId: string;
+      failureReason: string;
+      canResume: boolean;
+      completedSteps: number;
+      totalSteps: number;
+    }) => void): (() => void) => {
+      const handler = (_event: IpcRendererEvent, data: {
+        progressId: string;
+        failureReason: string;
+        canResume: boolean;
+        completedSteps: number;
+        totalSteps: number;
+      }) => callback(data);
+      ipcRenderer.on('failure:build-failed', handler);
+      return () => {
+        ipcRenderer.removeListener('failure:build-failed', handler);
+      };
+    },
+  },
 });

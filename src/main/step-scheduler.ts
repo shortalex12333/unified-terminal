@@ -28,6 +28,12 @@ import { assemblePrompt } from '../glue/assemble-prompt';
 import { normalize } from '../glue/normalizer';
 import type { GateCheckInput } from '../glue/normalizer';
 
+// Analytics (Local Telemetry)
+import { getAnalyticsTracker } from './analytics';
+
+// Failure System (Graceful Failure UX)
+import { getProgressSaver, detectFailureReason } from './failure';
+
 // ============================================================================
 // TYPE DEFINITIONS
 // ============================================================================
@@ -282,6 +288,16 @@ export class StepScheduler extends EventEmitter {
     // Emit plan start event
     schedulerEvents.planStart(plan.planId, plan.steps.length);
 
+    // Track build started analytics
+    const tracker = getAnalyticsTracker();
+    const template = plan.name || plan.context?.template || 'unknown';
+    const tier = this.determineTier(plan);
+    tracker.trackBuildStarted({
+      template,
+      tier,
+      plannedSteps: plan.steps.length,
+    });
+
     // Initialize runtime state
     this.currentPlan = plan;
     this.stopped = false;
@@ -333,15 +349,54 @@ export class StepScheduler extends EventEmitter {
     // Emit plan complete event to Status Agent
     schedulerEvents.planComplete(plan.planId, result.success, result.summary);
 
+    // Track build completed analytics
+    const completionTracker = getAnalyticsTracker();
+    completionTracker.trackBuildCompleted({
+      template: plan.name || plan.context?.template || 'unknown',
+      tier: this.determineTier(plan),
+      durationMs: result.durationMs,
+      stepsCompleted: result.summary.done,
+      stepsFailed: result.summary.failed,
+      stepsSkipped: result.summary.skipped,
+      success: result.success,
+    });
+
     this.currentPlan = null;
     return result;
   }
 
   /**
    * Stop current execution.
+   * @param reason - Reason for stopping
+   * @param error - Error that caused the stop (if any)
    */
-  stop(): void {
-    console.log('[StepScheduler] Stopping execution');
+  stop(reason: 'user_stop' | 'circuit_breaker' | 'timeout' | 'error' = 'user_stop', error?: Error | string): void {
+    console.log(`[StepScheduler] Stopping execution: ${reason}`);
+
+    // Track build cancelled analytics before stopping
+    if (this.currentPlan && !this.stopped) {
+      const tracker = getAnalyticsTracker();
+      const allSteps = Array.from(this.steps.values());
+      const currentStep = allSteps.find(s => s.status === 'running');
+      const failedStep = allSteps.find(s => s.status === 'failed');
+      const completedCount = allSteps.filter(s => s.status === 'done').length;
+
+      tracker.trackBuildCancelled({
+        currentStep: currentStep?.action || failedStep?.action || 'unknown',
+        reason,
+        stepNumber: currentStep?.id ?? failedStep?.id ?? completedCount + 1,
+        totalSteps: allSteps.length,
+        progressPercent: allSteps.length > 0
+          ? Math.round((completedCount / allSteps.length) * 100)
+          : 0,
+      });
+
+      // Save progress on failure (emit event for UI)
+      if (reason !== 'user_stop' && (failedStep || error)) {
+        this.saveProgressOnFailure(failedStep, error);
+      }
+    }
+
     this.stopped = true;
 
     // Cancel any running executors
@@ -353,6 +408,58 @@ export class StepScheduler extends EventEmitter {
     if (this.userDecisionResolver) {
       this.userDecisionResolver('stop');
       this.userDecisionResolver = null;
+    }
+  }
+
+  /**
+   * Save progress when an unrecoverable failure occurs.
+   * Emits 'build-failed-save-progress' event for UI to show FailureModal.
+   */
+  private async saveProgressOnFailure(
+    failedStep?: RuntimeStep,
+    error?: Error | string
+  ): Promise<void> {
+    if (!this.currentPlan) return;
+
+    const allSteps = Array.from(this.steps.values());
+    const errorMessage = error
+      ? (typeof error === 'string' ? error : error.message)
+      : failedStep?.error || 'Unknown error';
+
+    const failureReason = detectFailureReason(errorMessage);
+
+    try {
+      const progressSaver = getProgressSaver();
+      const savedProgress = await progressSaver.save({
+        planId: this.currentPlan.planId,
+        projectPath: this.currentPlan.context?.projectDir || process.cwd(),
+        projectName: this.currentPlan.name || 'Untitled Build',
+        steps: allSteps,
+        failedStepId: failedStep?.id || 0,
+        error: errorMessage,
+        originalMessage: this.currentPlan.context?.originalMessage,
+        context: this.currentPlan.context,
+      });
+
+      console.log(`[StepScheduler] Progress saved: ${savedProgress.id}`);
+
+      // Emit event for UI
+      this.emit('build-failed-save-progress', {
+        progress: savedProgress,
+        failureReason,
+        canResume: savedProgress.canResume,
+      });
+
+      // Send to renderer
+      this.emitIPC('failure:build-failed', {
+        progressId: savedProgress.id,
+        failureReason,
+        canResume: savedProgress.canResume,
+        completedSteps: savedProgress.completedSteps.length,
+        totalSteps: savedProgress.totalSteps,
+      });
+    } catch (saveError) {
+      console.error('[StepScheduler] Failed to save progress:', saveError);
     }
   }
 
@@ -862,6 +969,14 @@ export class StepScheduler extends EventEmitter {
         // Emit step failed event to Status Agent
         schedulerEvents.stepFailed(step.id, step.action, step.error || 'Unknown error', step.retryCount);
 
+        // Track error analytics
+        const errorTracker = getAnalyticsTracker();
+        errorTracker.trackErrorOccurred({
+          errorType: 'step_failure',
+          recoverable: true,
+          stepId: step.id,
+        });
+
         // Exponential backoff delay
         const delay = RETRY_BASE_DELAY_MS * Math.pow(2, step.retryCount - 1);
         console.log(`[StepScheduler] Retrying step ${step.id} in ${delay}ms`);
@@ -943,8 +1058,8 @@ export class StepScheduler extends EventEmitter {
         break;
 
       case 'stop':
-        // Stop entire execution
-        this.stop();
+        // Stop entire execution - save progress for resumption
+        this.stop('circuit_breaker', step.error);
         break;
     }
   }
@@ -1190,6 +1305,38 @@ export class StepScheduler extends EventEmitter {
    */
   private sleep(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  /**
+   * Determine the execution tier from the plan.
+   * Used for analytics tracking.
+   */
+  private determineTier(plan: ExecutionPlan): number {
+    // Check if plan has explicit tier in context
+    if (plan.context?.tier !== undefined) {
+      return plan.context.tier;
+    }
+
+    // Determine tier based on plan characteristics
+    const steps = plan.steps;
+
+    // Tier 0: Fast-path (single web step, trivial)
+    if (steps.length === 1 && steps[0].target === 'web') {
+      return 0;
+    }
+
+    // Tier 1: Router (simple classification)
+    if (steps.length <= 2 && steps.every(s => s.target === 'web' || s.target === 'cli')) {
+      return 1;
+    }
+
+    // Tier 2: CLI executor (mainly CLI operations)
+    if (steps.every(s => s.target === 'cli')) {
+      return 2;
+    }
+
+    // Tier 3: Hybrid (mix of targets, complex DAG)
+    return 3;
   }
 
   /**

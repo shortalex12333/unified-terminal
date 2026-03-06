@@ -85,12 +85,35 @@ import {
   FileChange,
 } from './file-watcher';
 import {
+  getPreviewManager,
+  cleanupPreviewManager,
+  PreviewManager,
+  PreviewConfig,
+  ServerDetectionResult,
+} from './preview-manager';
+import {
+  getAnalyticsTracker,
+  cleanupAnalyticsTracker,
+  cleanupAnalyticsStore,
+  AnalyticsSummary,
+} from './analytics';
+import {
   getProjectManager,
   ProjectManager,
   Project,
   ProjectDescription,
   PROJECT_ROOT,
 } from './project-manager';
+import {
+  getProjectStore,
+  cleanupProjectStore,
+  Project as StoredProject,
+  CreateProjectData,
+  UpdateProjectData,
+  ProjectOperationResult,
+  ProjectStatus,
+  DEFAULT_QUICK_ACTIONS,
+} from './projects';
 import {
   initializePluginSystem,
   cleanupPluginSystem,
@@ -145,6 +168,23 @@ import {
 } from './error-types';
 import * as path from 'path';
 
+// Failure System (Graceful Failure UX)
+import {
+  getProgressSaver,
+  cleanupProgressSaver,
+  SavedProgress,
+  SavedProgressSummary,
+  DownloadOptions,
+  DownloadResult,
+  ResumeOptions,
+  ResumeResult,
+  FailureReason,
+  FailureModalData,
+  FAILURE_LABELS,
+  FAILURE_DESCRIPTIONS,
+  detectFailureReason,
+} from './failure';
+
 // Conductor System (Intelligent Routing)
 import { fastPathCheck, FastPathResult } from './fast-path';
 import {
@@ -164,6 +204,20 @@ import { installInterceptor, setupInterceptorIPC } from './send-interceptor';
 
 // Status Agent (User-facing translation layer)
 import { initializeStatusAgent, cleanupStatusAgent } from '../status-agent';
+
+// MCP (Model Context Protocol) Account Connection
+import {
+  getMCPManager,
+  cleanupMCPManager,
+  getMCPDetector,
+  MCPServer,
+  MCPConnection,
+  MCPConnectResult,
+  MCPDisconnectResult,
+  MCPDetectionResult,
+  MCPStatusChangeEvent,
+  MCPConnectionRequiredEvent,
+} from './mcp';
 
 // Executors (Phase 2: Wire into step-scheduler)
 import { getCLIExecutor, cleanupCLIExecutor as cleanupCLIExec } from './executors/cli-executor';
@@ -685,6 +739,14 @@ app.whenReady().then(() => {
   initializePluginSystem();
   setupPluginIPC();
 
+  // Initialize preview manager (Live Preview)
+  setupPreviewIPC();
+  if (mainWindow) {
+    const previewManager = getPreviewManager();
+    previewManager.setMainWindow(mainWindow);
+  }
+  console.log('[App] Preview Manager initialized');
+
   // Initialize auto-updater (Gate 12) -- skip in test mode
   if (!isTestMode) {
     setupUpdaterIPC(() => mainWindow);
@@ -812,6 +874,45 @@ app.whenReady().then(() => {
     console.log('[App] Status Agent initialized');
   }
 
+  // Initialize MCP Manager (Model Context Protocol Account Connection)
+  const mcpManager = getMCPManager();
+  if (mainWindow) {
+    mcpManager.setMainWindow(mainWindow);
+  }
+  mcpManager.initialize().then(() => {
+    console.log('[App] MCP Manager initialized');
+  }).catch((err) => {
+    console.error('[App] MCP Manager initialization failed:', err);
+  });
+
+  // Forward MCP events to renderer
+  mcpManager.on('status-change', (event: MCPStatusChangeEvent) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('mcp:status-change', event);
+    }
+  });
+
+  mcpManager.on('connection-added', (connection: MCPConnection) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('mcp:connection-added', connection);
+    }
+  });
+
+  mcpManager.on('connection-removed', (serverId: string) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('mcp:connection-removed', serverId);
+    }
+  });
+
+  mcpManager.on('connection-error', (data: { serverId: string; error: string }) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('mcp:connection-error', data);
+    }
+  });
+
+  // Set up MCP IPC handlers
+  setupMCPIPC();
+
   // Initialize Rate Limit Recovery (check for deferred work from previous session)
   const rateLimitRecovery = getRateLimitRecovery();
   // Note: Full scheduler integration happens when a plan is executed
@@ -907,6 +1008,11 @@ app.on('will-quit', async () => {
   cleanupCodexAdapter();
   cleanupErrorHandler();
   cleanupStatusAgent();
+  cleanupMCPManager();
+  cleanupPreviewManager();
+  cleanupAnalyticsTracker();
+  cleanupAnalyticsStore();
+  cleanupProjectStore();
   await cleanupFileWatcher();
 });
 
@@ -1679,6 +1785,233 @@ ipcMain.handle('project:root-path', async (): Promise<string> => {
 });
 
 // ============================================================================
+// IPC HANDLERS - Projects Store (Post-Build Continuation)
+// ============================================================================
+
+/**
+ * IPC: List all stored projects
+ * @param status - Optional status filter ('active' | 'archived')
+ * @returns Array of StoredProject objects sorted by lastModifiedAt
+ */
+ipcMain.handle('projects:list', async (
+  _event,
+  status?: ProjectStatus
+): Promise<StoredProject[]> => {
+  console.log('[IPC] projects:list called', status ? `(status: ${status})` : '');
+  const store = getProjectStore();
+  return store.list(status);
+});
+
+/**
+ * IPC: Get a stored project by ID
+ * @param id - Project ID
+ * @returns StoredProject object or null if not found
+ */
+ipcMain.handle('projects:get', async (
+  _event,
+  id: string
+): Promise<StoredProject | null> => {
+  console.log(`[IPC] projects:get called: ${id}`);
+  const store = getProjectStore();
+  return store.get(id);
+});
+
+/**
+ * IPC: Create a new stored project
+ * @param data - Project creation data
+ * @returns ProjectOperationResult with success status and project
+ */
+ipcMain.handle('projects:create', async (
+  _event,
+  data: CreateProjectData
+): Promise<ProjectOperationResult> => {
+  console.log(`[IPC] projects:create called: ${data.name}`);
+  const store = getProjectStore();
+  return store.create(data);
+});
+
+/**
+ * IPC: Update a stored project
+ * @param id - Project ID
+ * @param updates - Partial update data
+ * @returns ProjectOperationResult with success status
+ */
+ipcMain.handle('projects:update', async (
+  _event,
+  id: string,
+  updates: UpdateProjectData
+): Promise<ProjectOperationResult> => {
+  console.log(`[IPC] projects:update called: ${id}`);
+  const store = getProjectStore();
+  return store.update(id, updates);
+});
+
+/**
+ * IPC: Archive a project (soft delete)
+ * @param id - Project ID
+ * @returns ProjectOperationResult with success status
+ */
+ipcMain.handle('projects:archive', async (
+  _event,
+  id: string
+): Promise<ProjectOperationResult> => {
+  console.log(`[IPC] projects:archive called: ${id}`);
+  const store = getProjectStore();
+  return store.archive(id);
+});
+
+/**
+ * IPC: Unarchive a project
+ * @param id - Project ID
+ * @returns ProjectOperationResult with success status
+ */
+ipcMain.handle('projects:unarchive', async (
+  _event,
+  id: string
+): Promise<ProjectOperationResult> => {
+  console.log(`[IPC] projects:unarchive called: ${id}`);
+  const store = getProjectStore();
+  return store.unarchive(id);
+});
+
+/**
+ * IPC: Permanently delete a project from the store
+ * Note: This does NOT delete the project files
+ * @param id - Project ID
+ * @returns ProjectOperationResult with success status
+ */
+ipcMain.handle('projects:delete', async (
+  _event,
+  id: string
+): Promise<ProjectOperationResult> => {
+  console.log(`[IPC] projects:delete called: ${id}`);
+  const store = getProjectStore();
+  return store.delete(id);
+});
+
+/**
+ * IPC: Search projects by name or description
+ * @param query - Search query string
+ * @returns Array of matching projects
+ */
+ipcMain.handle('projects:search', async (
+  _event,
+  query: string
+): Promise<StoredProject[]> => {
+  console.log(`[IPC] projects:search called: "${query}"`);
+  const store = getProjectStore();
+  return store.search(query);
+});
+
+/**
+ * IPC: Get recently modified projects
+ * @param limit - Maximum number of projects to return
+ * @returns Array of recent projects
+ */
+ipcMain.handle('projects:recent', async (
+  _event,
+  limit?: number
+): Promise<StoredProject[]> => {
+  console.log(`[IPC] projects:recent called (limit: ${limit ?? 5})`);
+  const store = getProjectStore();
+  return store.getRecent(limit);
+});
+
+/**
+ * IPC: Touch a project to update its lastModifiedAt timestamp
+ * @param id - Project ID
+ * @returns ProjectOperationResult with success status
+ */
+ipcMain.handle('projects:touch', async (
+  _event,
+  id: string
+): Promise<ProjectOperationResult> => {
+  console.log(`[IPC] projects:touch called: ${id}`);
+  const store = getProjectStore();
+  return store.touch(id);
+});
+
+/**
+ * IPC: Get project by path
+ * @param projectPath - Absolute path to project directory
+ * @returns StoredProject or null
+ */
+ipcMain.handle('projects:get-by-path', async (
+  _event,
+  projectPath: string
+): Promise<StoredProject | null> => {
+  console.log(`[IPC] projects:get-by-path called: ${projectPath}`);
+  const store = getProjectStore();
+  return store.getByPath(projectPath);
+});
+
+/**
+ * IPC: Open a project in the ChatInterface with context
+ * This touches the project and returns it with quick actions
+ * @param id - Project ID
+ * @returns Object with project and available quick actions
+ */
+ipcMain.handle('projects:open', async (
+  _event,
+  id: string
+): Promise<{ project: StoredProject | null; quickActions: typeof DEFAULT_QUICK_ACTIONS }> => {
+  console.log(`[IPC] projects:open called: ${id}`);
+  const store = getProjectStore();
+  const project = store.get(id);
+
+  if (project) {
+    // Update lastModifiedAt
+    store.touch(id);
+  }
+
+  return {
+    project,
+    quickActions: DEFAULT_QUICK_ACTIONS,
+  };
+});
+
+/**
+ * IPC: Get default quick actions
+ * @returns Array of default quick actions
+ */
+ipcMain.handle('projects:quick-actions', async (): Promise<typeof DEFAULT_QUICK_ACTIONS> => {
+  console.log('[IPC] projects:quick-actions called');
+  return DEFAULT_QUICK_ACTIONS;
+});
+
+/**
+ * IPC: Cleanup orphaned projects (directories no longer exist)
+ * @returns Number of projects removed
+ */
+ipcMain.handle('projects:cleanup', async (): Promise<number> => {
+  console.log('[IPC] projects:cleanup called');
+  const store = getProjectStore();
+  return store.cleanup();
+});
+
+/**
+ * IPC: Open project folder in Finder
+ * @param id - Project ID
+ * @returns True if opened successfully
+ */
+ipcMain.handle('projects:open-folder', async (
+  _event,
+  id: string
+): Promise<boolean> => {
+  console.log(`[IPC] projects:open-folder called: ${id}`);
+  const store = getProjectStore();
+  const project = store.get(id);
+
+  if (!project) {
+    return false;
+  }
+
+  shell.showItemInFolder(project.path);
+  store.touch(id);
+  return true;
+});
+
+// ============================================================================
 // IPC HANDLERS - Plugin System (Gate 10)
 // ============================================================================
 
@@ -2236,6 +2569,405 @@ ipcMain.handle('shell:open-external', async (
 });
 
 // ============================================================================
+// IPC HANDLERS - Preview Manager (Live Preview)
+// ============================================================================
+
+/**
+ * Initialize Preview Manager and set up event forwarding to renderer
+ */
+function setupPreviewIPC(): void {
+  const previewManager = getPreviewManager();
+
+  // Forward preview events to renderer
+  previewManager.on('shown', (data: { url: string; port: number }) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('preview:shown', data);
+    }
+  });
+
+  previewManager.on('hidden', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('preview:hidden');
+    }
+  });
+
+  previewManager.on('refreshed', (data: { url: string }) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('preview:refreshed', data);
+    }
+  });
+
+  previewManager.on('loaded', (data: { url: string }) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('preview:loaded', data);
+    }
+  });
+
+  previewManager.on('load-error', (data: { errorCode: number; errorDescription: string; url: string }) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('preview:load-error', data);
+    }
+  });
+
+  previewManager.on('navigated', (data: { url: string }) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('preview:navigated', data);
+    }
+  });
+}
+
+/**
+ * IPC: Show preview panel with URL
+ * @param url - The URL to display in preview
+ */
+ipcMain.handle('preview:show', async (
+  _event,
+  url: string
+): Promise<{ success: boolean; error?: string }> => {
+  console.log(`[IPC] preview:show called: ${url}`);
+  const previewManager = getPreviewManager();
+
+  // Ensure main window is set
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    previewManager.setMainWindow(mainWindow);
+  }
+
+  return previewManager.show(url);
+});
+
+/**
+ * IPC: Hide preview panel
+ */
+ipcMain.handle('preview:hide', async (): Promise<{ success: boolean }> => {
+  console.log('[IPC] preview:hide called');
+  const previewManager = getPreviewManager();
+  return previewManager.hide();
+});
+
+/**
+ * IPC: Refresh preview panel
+ */
+ipcMain.handle('preview:refresh', async (): Promise<{ success: boolean; error?: string }> => {
+  console.log('[IPC] preview:refresh called');
+  const previewManager = getPreviewManager();
+  return previewManager.refresh();
+});
+
+/**
+ * IPC: Auto-detect running dev server
+ */
+ipcMain.handle('preview:detect-server', async (): Promise<ServerDetectionResult> => {
+  console.log('[IPC] preview:detect-server called');
+  const previewManager = getPreviewManager();
+  return previewManager.detectServer();
+});
+
+/**
+ * IPC: Set preview port (shorthand for show with localhost URL)
+ * @param port - The port number
+ */
+ipcMain.handle('preview:set-port', async (
+  _event,
+  port: number
+): Promise<{ success: boolean; error?: string }> => {
+  console.log(`[IPC] preview:set-port called: ${port}`);
+  const previewManager = getPreviewManager();
+
+  // Ensure main window is set
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    previewManager.setMainWindow(mainWindow);
+  }
+
+  return previewManager.setPort(port);
+});
+
+/**
+ * IPC: Get preview configuration
+ */
+ipcMain.handle('preview:get-config', async (): Promise<PreviewConfig> => {
+  const previewManager = getPreviewManager();
+  return previewManager.getConfig();
+});
+
+/**
+ * IPC: Set auto-refresh enabled/disabled
+ * @param enabled - Whether to enable auto-refresh
+ */
+ipcMain.handle('preview:set-auto-refresh', async (
+  _event,
+  enabled: boolean
+): Promise<void> => {
+  console.log(`[IPC] preview:set-auto-refresh called: ${enabled}`);
+  const previewManager = getPreviewManager();
+  previewManager.setAutoRefresh(enabled);
+});
+
+/**
+ * IPC: Navigate to a new URL in preview
+ * @param url - The URL to navigate to
+ */
+ipcMain.handle('preview:navigate', async (
+  _event,
+  url: string
+): Promise<{ success: boolean; error?: string }> => {
+  console.log(`[IPC] preview:navigate called: ${url}`);
+  const previewManager = getPreviewManager();
+  return previewManager.navigate(url);
+});
+
+/**
+ * IPC: Check if preview is visible
+ */
+ipcMain.handle('preview:is-visible', async (): Promise<boolean> => {
+  const previewManager = getPreviewManager();
+  return previewManager.isVisible();
+});
+
+/**
+ * IPC: Get current preview URL
+ */
+ipcMain.handle('preview:get-url', async (): Promise<string> => {
+  const previewManager = getPreviewManager();
+  return previewManager.getCurrentUrl();
+});
+
+// ============================================================================
+// IPC HANDLERS - Analytics (Local Telemetry)
+// ============================================================================
+
+/**
+ * IPC: Get analytics summary
+ * Returns aggregated statistics about builds, templates, etc.
+ */
+ipcMain.handle('analytics:get-summary', async (): Promise<AnalyticsSummary> => {
+  console.log('[IPC] analytics:get-summary called');
+  const tracker = getAnalyticsTracker();
+  return tracker.getSummary();
+});
+
+/**
+ * IPC: Export all analytics data as JSON
+ * Returns the full event log for user inspection.
+ */
+ipcMain.handle('analytics:export', async (): Promise<string> => {
+  console.log('[IPC] analytics:export called');
+  const tracker = getAnalyticsTracker();
+  return tracker.exportData();
+});
+
+/**
+ * IPC: Clear all analytics data
+ * Removes all stored events from the local database.
+ */
+ipcMain.handle('analytics:clear', async (): Promise<void> => {
+  console.log('[IPC] analytics:clear called');
+  const tracker = getAnalyticsTracker();
+  tracker.clearAll();
+});
+
+/**
+ * IPC: Check if analytics is enabled
+ */
+ipcMain.handle('analytics:is-enabled', async (): Promise<boolean> => {
+  const tracker = getAnalyticsTracker();
+  return tracker.isEnabled();
+});
+
+/**
+ * IPC: Enable or disable analytics
+ */
+ipcMain.handle('analytics:set-enabled', async (
+  _event,
+  enabled: boolean
+): Promise<void> => {
+  console.log(`[IPC] analytics:set-enabled called: ${enabled}`);
+  const tracker = getAnalyticsTracker();
+  if (enabled) {
+    tracker.enable();
+  } else {
+    tracker.disable();
+  }
+});
+
+// ============================================================================
+// IPC HANDLERS - MCP (Model Context Protocol) Account Connection
+// ============================================================================
+
+/**
+ * Set up MCP IPC handlers for renderer communication.
+ */
+function setupMCPIPC(): void {
+  const mcpManager = getMCPManager();
+  const mcpDetector = getMCPDetector();
+
+  // Forward MCP connection required events to renderer
+  // (This is called from step-scheduler when a step needs MCP)
+  mcpManager.on('connection-required', (event: MCPConnectionRequiredEvent) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('mcp:connection-required', event);
+    }
+  });
+}
+
+/**
+ * IPC: List all available MCP servers
+ * @returns Array of MCPServer objects
+ */
+ipcMain.handle('mcp:list-servers', async (): Promise<MCPServer[]> => {
+  console.log('[IPC] mcp:list-servers called');
+  const mcpManager = getMCPManager();
+  return mcpManager.listServers();
+});
+
+/**
+ * IPC: Get a specific MCP server by ID
+ * @param serverId - Server ID to look up
+ * @returns MCPServer or null
+ */
+ipcMain.handle('mcp:get-server', async (
+  _event,
+  serverId: string
+): Promise<MCPServer | null> => {
+  console.log(`[IPC] mcp:get-server called: ${serverId}`);
+  const mcpManager = getMCPManager();
+  return mcpManager.getServer(serverId);
+});
+
+/**
+ * IPC: Connect to an MCP server (initiates OAuth flow)
+ * @param serverId - Server ID to connect
+ * @param options - Optional connection options
+ * @returns MCPConnectResult
+ */
+ipcMain.handle('mcp:connect', async (
+  _event,
+  serverId: string,
+  options?: { force?: boolean; timeout?: number }
+): Promise<MCPConnectResult> => {
+  console.log(`[IPC] mcp:connect called: ${serverId}`);
+  const mcpManager = getMCPManager();
+  return mcpManager.connect({
+    serverId,
+    force: options?.force,
+    timeout: options?.timeout,
+  });
+});
+
+/**
+ * IPC: Set API key for a non-OAuth MCP server
+ * @param serverId - Server ID
+ * @param apiKey - API key to set
+ * @returns MCPConnectResult
+ */
+ipcMain.handle('mcp:set-api-key', async (
+  _event,
+  serverId: string,
+  apiKey: string
+): Promise<MCPConnectResult> => {
+  console.log(`[IPC] mcp:set-api-key called: ${serverId}`);
+  const mcpManager = getMCPManager();
+  return mcpManager.setApiKey(serverId, apiKey);
+});
+
+/**
+ * IPC: Disconnect from an MCP server
+ * @param serverId - Server ID to disconnect
+ * @param options - Optional disconnect options
+ * @returns MCPDisconnectResult
+ */
+ipcMain.handle('mcp:disconnect', async (
+  _event,
+  serverId: string,
+  options?: { revokeToken?: boolean }
+): Promise<MCPDisconnectResult> => {
+  console.log(`[IPC] mcp:disconnect called: ${serverId}`);
+  const mcpManager = getMCPManager();
+  return mcpManager.disconnect({
+    serverId,
+    revokeToken: options?.revokeToken,
+  });
+});
+
+/**
+ * IPC: Check if an MCP server is connected
+ * @param serverId - Server ID to check
+ * @returns boolean
+ */
+ipcMain.handle('mcp:is-connected', async (
+  _event,
+  serverId: string
+): Promise<boolean> => {
+  const mcpManager = getMCPManager();
+  return mcpManager.isConnected(serverId);
+});
+
+/**
+ * IPC: Get connection for an MCP server
+ * @param serverId - Server ID
+ * @returns MCPConnection or null
+ */
+ipcMain.handle('mcp:get-connection', async (
+  _event,
+  serverId: string
+): Promise<MCPConnection | null> => {
+  const mcpManager = getMCPManager();
+  return mcpManager.getConnection(serverId);
+});
+
+/**
+ * IPC: Get all active MCP connections
+ * @returns Array of MCPConnection objects
+ */
+ipcMain.handle('mcp:get-connections', async (): Promise<MCPConnection[]> => {
+  const mcpManager = getMCPManager();
+  return mcpManager.getConnections();
+});
+
+/**
+ * IPC: Check required MCP servers for a step
+ * @param stepAction - Step action name
+ * @param stepDetail - Step detail/description
+ * @returns MCPDetectionResult
+ */
+ipcMain.handle('mcp:check-required', async (
+  _event,
+  stepAction: string,
+  stepDetail: string
+): Promise<MCPDetectionResult> => {
+  console.log(`[IPC] mcp:check-required called: ${stepAction}`);
+  const mcpDetector = getMCPDetector();
+  return mcpDetector.detect(stepAction, stepDetail);
+});
+
+/**
+ * IPC: Verify an MCP connection is still valid
+ * @param serverId - Server ID to verify
+ * @returns boolean
+ */
+ipcMain.handle('mcp:verify-connection', async (
+  _event,
+  serverId: string
+): Promise<boolean> => {
+  console.log(`[IPC] mcp:verify-connection called: ${serverId}`);
+  const mcpManager = getMCPManager();
+  return mcpManager.verifyConnection(serverId);
+});
+
+/**
+ * IPC: Refresh access token for an MCP server
+ * @param serverId - Server ID to refresh
+ * @returns boolean
+ */
+ipcMain.handle('mcp:refresh-token', async (
+  _event,
+  serverId: string
+): Promise<boolean> => {
+  console.log(`[IPC] mcp:refresh-token called: ${serverId}`);
+  const mcpManager = getMCPManager();
+  return mcpManager.refreshToken(serverId);
+});
+
+// ============================================================================
 // EXPORTS (for testing/debugging)
 // ============================================================================
 
@@ -2288,4 +3020,15 @@ export {
   cleanupStepScheduler,
   getRateLimitRecovery,
   cleanupRateLimitRecovery,
+  // Preview Manager exports (Live Preview)
+  getPreviewManager,
+  cleanupPreviewManager,
+  // Analytics exports (Local Telemetry)
+  getAnalyticsTracker,
+  cleanupAnalyticsTracker,
+  cleanupAnalyticsStore,
+  // MCP exports (Model Context Protocol Account Connection)
+  getMCPManager,
+  cleanupMCPManager,
+  getMCPDetector,
 };

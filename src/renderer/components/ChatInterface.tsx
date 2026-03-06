@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 
 export type Provider = 'chatgpt' | 'gemini' | 'claude';
 
 interface Props {
   provider: Provider;
   onLogout: () => void;
+  initialPrompt?: string | null;
 }
 
 interface ProviderConfig {
@@ -38,10 +39,38 @@ const PROVIDER_CONFIG: Record<Provider, ProviderConfig> = {
  * This component just shows a bottom nav bar with "Switch AI" button.
  * The BrowserView is sized to leave 56px at bottom for this bar.
  */
-export default function ChatInterface({ provider, onLogout }: Props) {
+export default function ChatInterface({ provider, onLogout, initialPrompt }: Props) {
   const config = PROVIDER_CONFIG[provider];
+  const hasSentInitialPrompt = useRef(false);
 
   console.log('[ChatInterface] Rendering nav bar for provider:', provider);
+
+  // Auto-send initial prompt when chat loads
+  useEffect(() => {
+    if (initialPrompt && !hasSentInitialPrompt.current) {
+      hasSentInitialPrompt.current = true;
+      console.log('[ChatInterface] Auto-sending initial prompt:', initialPrompt.substring(0, 50) + '...');
+
+      // Small delay to ensure BrowserView is ready, then inject and send
+      const timer = setTimeout(async () => {
+        try {
+          // Wait for page to be ready
+          const isReady = await window.electronAPI?.waitForPageReady?.(10000);
+          if (isReady) {
+            // Inject the prompt and trigger send
+            const result = await window.electronAPI?.injectAndSend?.(initialPrompt);
+            console.log('[ChatInterface] Inject and send result:', result);
+          } else {
+            console.warn('[ChatInterface] Page not ready after 10s, skipping auto-send');
+          }
+        } catch (err) {
+          console.error('[ChatInterface] Error auto-sending prompt:', err);
+        }
+      }, 2000);
+
+      return () => clearTimeout(timer);
+    }
+  }, [initialPrompt]);
 
   const handleSwitchAI = async () => {
     // Hide BrowserView before switching

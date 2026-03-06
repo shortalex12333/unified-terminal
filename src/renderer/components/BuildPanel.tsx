@@ -1,8 +1,9 @@
 /**
  * BuildPanel Component
  *
- * Container component for ProgressTree + FuelGauge.
+ * Container component for ProgressTree + FuelGauge + PreviewPanel.
  * Handles minimize/expand transitions and shows build outputs when complete.
+ * Features tabbed interface to switch between Tree view and Preview.
  *
  * This is a self-contained panel that can be mounted anywhere and will
  * automatically subscribe to status agent events.
@@ -11,6 +12,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import ProgressTree from './ProgressTree';
 import FuelGauge from './FuelGauge';
+import PreviewPanel from './PreviewPanel';
+import UndoButton from './UndoButton';
 import { useStatusAgent, RenderTreeNode } from '../hooks/useStatusAgent';
 
 // =============================================================================
@@ -18,6 +21,7 @@ import { useStatusAgent, RenderTreeNode } from '../hooks/useStatusAgent';
 // =============================================================================
 
 export type PanelState = 'hidden' | 'expanded' | 'minimised' | 'complete';
+export type ActiveTab = 'tree' | 'preview';
 
 export interface BuildOutput {
   type: 'url' | 'file' | 'artifact';
@@ -28,14 +32,20 @@ export interface BuildOutput {
 export interface BuildPanelProps {
   /** Initial panel state */
   initialState?: PanelState;
+  /** Initial active tab */
+  initialTab?: ActiveTab;
   /** Callback when panel state changes */
   onStateChange?: (state: PanelState) => void;
+  /** Callback when active tab changes */
+  onTabChange?: (tab: ActiveTab) => void;
   /** Custom outputs to display on completion */
   outputs?: BuildOutput[];
   /** Whether to show as overlay (default) or inline */
   inline?: boolean;
   /** Custom class name */
   className?: string;
+  /** Show preview tab */
+  showPreviewTab?: boolean;
 }
 
 // =============================================================================
@@ -72,7 +82,122 @@ const globalStyles = `
     from { opacity: 0; transform: translateY(-20px); }
     to { opacity: 1; transform: translateY(0); }
   }
+  @keyframes buildPanelTabSlide {
+    from { opacity: 0; transform: translateX(-10px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
 `;
+
+// =============================================================================
+// TAB BAR SUB-COMPONENT
+// =============================================================================
+
+interface TabBarProps {
+  activeTab: ActiveTab;
+  onTabChange: (tab: ActiveTab) => void;
+  showPreview: boolean;
+  hasPreviewUrl: boolean;
+}
+
+function TabBar({ activeTab, onTabChange, showPreview, hasPreviewUrl }: TabBarProps): React.ReactElement {
+  return (
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 4,
+        padding: '8px 16px',
+        borderBottom: `1px solid ${C.border}`,
+        background: C.surface,
+      }}
+    >
+      {/* Tree tab */}
+      <button
+        onClick={() => onTabChange('tree')}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          padding: '8px 14px',
+          borderRadius: 8,
+          border: 'none',
+          background: activeTab === 'tree' ? C.accentSoft : 'transparent',
+          color: activeTab === 'tree' ? C.accent : C.textSub,
+          fontSize: 13,
+          fontWeight: activeTab === 'tree' ? 600 : 400,
+          cursor: 'pointer',
+          transition: 'all 0.15s',
+        }}
+      >
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <line x1="8" y1="6" x2="21" y2="6" />
+          <line x1="8" y1="12" x2="21" y2="12" />
+          <line x1="8" y1="18" x2="21" y2="18" />
+          <line x1="3" y1="6" x2="3.01" y2="6" />
+          <line x1="3" y1="12" x2="3.01" y2="12" />
+          <line x1="3" y1="18" x2="3.01" y2="18" />
+        </svg>
+        Progress
+      </button>
+
+      {/* Preview tab */}
+      {showPreview && (
+        <button
+          onClick={() => onTabChange('preview')}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            padding: '8px 14px',
+            borderRadius: 8,
+            border: 'none',
+            background: activeTab === 'preview' ? C.accentSoft : 'transparent',
+            color: activeTab === 'preview' ? C.accent : C.textSub,
+            fontSize: 13,
+            fontWeight: activeTab === 'preview' ? 600 : 400,
+            cursor: 'pointer',
+            transition: 'all 0.15s',
+          }}
+        >
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+            <circle cx="12" cy="12" r="3" />
+          </svg>
+          Preview
+          {hasPreviewUrl && (
+            <span
+              style={{
+                width: 6,
+                height: 6,
+                borderRadius: '50%',
+                background: C.success,
+                marginLeft: 2,
+              }}
+            />
+          )}
+        </button>
+      )}
+    </div>
+  );
+}
 
 // =============================================================================
 // COMPLETE BANNER SUB-COMPONENT
@@ -80,11 +205,13 @@ const globalStyles = `
 
 interface CompleteBannerProps {
   projectName: string;
+  projectPath?: string;
   outputs: BuildOutput[];
   onDismiss: () => void;
+  onUndoComplete?: () => void;
 }
 
-function CompleteBanner({ projectName, outputs, onDismiss }: CompleteBannerProps): React.ReactElement {
+function CompleteBanner({ projectName, projectPath, outputs, onDismiss, onUndoComplete }: CompleteBannerProps): React.ReactElement {
   return (
     <div
       style={{
@@ -170,25 +297,40 @@ function CompleteBanner({ projectName, outputs, onDismiss }: CompleteBannerProps
         </div>
       )}
 
-      {/* Dismiss button */}
-      <button
-        onClick={onDismiss}
-        style={{
-          padding: '10px 16px',
-          borderRadius: 10,
-          border: `1px solid ${C.border}`,
-          background: C.surface,
-          fontSize: 13,
-          color: C.textSub,
-          cursor: 'pointer',
-          transition: 'all 0.15s',
-          alignSelf: 'flex-end',
-        }}
-        onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.background = C.bg)}
-        onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.background = C.surface)}
-      >
-        Dismiss
-      </button>
+      {/* Action buttons */}
+      <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', alignItems: 'center' }}>
+        {/* Undo button */}
+        {projectPath && (
+          <UndoButton
+            projectPath={projectPath}
+            projectName={projectName}
+            onUndoComplete={() => {
+              onUndoComplete?.();
+              onDismiss();
+            }}
+            size="sm"
+          />
+        )}
+
+        {/* Dismiss button */}
+        <button
+          onClick={onDismiss}
+          style={{
+            padding: '10px 16px',
+            borderRadius: 10,
+            border: `1px solid ${C.border}`,
+            background: C.surface,
+            fontSize: 13,
+            color: C.textSub,
+            cursor: 'pointer',
+            transition: 'all 0.15s',
+          }}
+          onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.background = C.bg)}
+          onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.background = C.surface)}
+        >
+          Dismiss
+        </button>
+      </div>
     </div>
   );
 }
@@ -199,14 +341,20 @@ function CompleteBanner({ projectName, outputs, onDismiss }: CompleteBannerProps
 
 export default function BuildPanel({
   initialState = 'hidden',
+  initialTab = 'tree',
   onStateChange,
+  onTabChange,
   outputs: propOutputs,
   inline = false,
   className,
+  showPreviewTab = true,
 }: BuildPanelProps): React.ReactElement | null {
   // Panel state
   const [panelState, setPanelState] = useState<PanelState>(initialState);
   const [outputs, setOutputs] = useState<BuildOutput[]>(propOutputs ?? []);
+  const [activeTab, setActiveTab] = useState<ActiveTab>(initialTab);
+  const [previewUrl, setPreviewUrl] = useState<string>('');
+  const [projectPath, setProjectPath] = useState<string>('');
 
   // Get status agent state
   const {
@@ -241,6 +389,21 @@ export default function BuildPanel({
     onStateChange?.(panelState);
   }, [panelState, onStateChange]);
 
+  // Notify parent of tab changes
+  useEffect(() => {
+    onTabChange?.(activeTab);
+  }, [activeTab, onTabChange]);
+
+  // Handle tab change
+  const handleTabChange = useCallback((tab: ActiveTab) => {
+    setActiveTab(tab);
+  }, []);
+
+  // Handle preview URL change (from PreviewPanel)
+  const handlePreviewUrlChange = useCallback((url: string) => {
+    setPreviewUrl(url);
+  }, []);
+
   // Subscribe to build complete for outputs
   useEffect(() => {
     const cleanup = window.electronAPI?.statusAgent?.onBuildComplete?.((data) => {
@@ -252,6 +415,11 @@ export default function BuildPanel({
             value: o.value,
           }))
         );
+        // Extract project path from file outputs if available
+        const fileOutput = data.outputs.find((o) => o.type === 'file');
+        if (fileOutput) {
+          setProjectPath(fileOutput.value);
+        }
       }
     });
 
@@ -294,6 +462,7 @@ export default function BuildPanel({
         <style>{globalStyles}</style>
         <CompleteBanner
           projectName={projectName || 'Project'}
+          projectPath={projectPath}
           outputs={outputs}
           onDismiss={handleDismiss}
         />
@@ -306,13 +475,15 @@ export default function BuildPanel({
     return null;
   }
 
-  // Expanded state - show full progress tree
+  // Expanded state - show full progress tree with tabs
   const containerStyle: React.CSSProperties = inline
     ? {
         width: '100%',
         height: '100%',
         background: C.bg,
-        overflow: 'auto',
+        overflow: 'hidden',
+        display: 'flex',
+        flexDirection: 'column',
       }
     : {
         position: 'fixed',
@@ -321,45 +492,27 @@ export default function BuildPanel({
         backdropFilter: 'blur(4px)',
         zIndex: 40,
         animation: 'buildPanelFadeIn 0.2s ease-out',
+        display: 'flex',
+        flexDirection: 'column',
       };
 
   return (
     <div className={`build-panel theme-dark ${className ?? ''}`} style={containerStyle}>
       <style>{globalStyles}</style>
 
-      {/* Minimize button (only for overlay mode) */}
+      {/* Header with minimize button and fuel gauge (only for overlay mode) */}
       {!inline && (
-        <button
-          onClick={handleMinimize}
+        <div
           style={{
-            position: 'absolute',
-            top: 16,
-            right: 16,
-            width: 32,
-            height: 32,
-            borderRadius: 8,
-            border: `1px solid ${C.border}`,
-            background: C.surface,
-            cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: 14,
-            color: C.textSub,
-            transition: 'all 0.15s',
-            zIndex: 10,
+            justifyContent: 'space-between',
+            padding: '12px 16px',
+            background: C.surface,
+            borderBottom: `1px solid ${C.border}`,
           }}
-          onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.background = C.bg)}
-          onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.background = C.surface)}
-          title="Minimize"
         >
-          {'\u2193'}
-        </button>
-      )}
-
-      {/* Fuel gauge in corner (only for overlay mode) */}
-      {!inline && (
-        <div style={{ position: 'absolute', top: 16, left: 16, zIndex: 10 }}>
+          {/* Fuel gauge */}
           <FuelGauge
             percent={fuel.percent}
             label={fuel.label}
@@ -367,34 +520,77 @@ export default function BuildPanel({
             warning={fuel.warning}
             warningText={fuel.warningText}
           />
+
+          {/* Minimize button */}
+          <button
+            onClick={handleMinimize}
+            style={{
+              width: 32,
+              height: 32,
+              borderRadius: 8,
+              border: `1px solid ${C.border}`,
+              background: C.bg,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: 14,
+              color: C.textSub,
+              transition: 'all 0.15s',
+            }}
+            onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.background = C.surface)}
+            onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.background = C.bg)}
+            title="Minimize"
+          >
+            {'\u2193'}
+          </button>
         </div>
       )}
 
-      {/* Progress tree */}
-      <ProgressTree
-        tree={tree}
-        query={
-          query
-            ? {
-                id: query.id,
-                question: query.question,
-                options: query.options,
-                defaultChoice: query.defaultChoice,
-              }
-            : null
-        }
-        projectName={projectName || 'Building...'}
-        overallProgress={overallProgress}
-        queryTimer={queryTimer}
-        interruptFeedback={interruptFeedback}
-        onQueryResponse={sendQueryResponse}
-        onCorrection={sendCorrection}
-        onStopStep={sendStopStep}
-        onStopAll={handleStopAll}
-        onPause={handleMinimize}
+      {/* Tab bar */}
+      <TabBar
+        activeTab={activeTab}
+        onTabChange={handleTabChange}
+        showPreview={showPreviewTab}
+        hasPreviewUrl={!!previewUrl}
       />
+
+      {/* Tab content */}
+      <div style={{ flex: 1, overflow: 'auto' }}>
+        {activeTab === 'tree' && (
+          <ProgressTree
+            tree={tree}
+            query={
+              query
+                ? {
+                    id: query.id,
+                    question: query.question,
+                    options: query.options,
+                    defaultChoice: query.defaultChoice,
+                  }
+                : null
+            }
+            projectName={projectName || 'Building...'}
+            overallProgress={overallProgress}
+            queryTimer={queryTimer}
+            interruptFeedback={interruptFeedback}
+            onQueryResponse={sendQueryResponse}
+            onCorrection={sendCorrection}
+            onStopStep={sendStopStep}
+            onStopAll={handleStopAll}
+            onPause={handleMinimize}
+          />
+        )}
+
+        {activeTab === 'preview' && (
+          <PreviewPanel
+            isActive={activeTab === 'preview'}
+            onUrlChange={handlePreviewUrlChange}
+          />
+        )}
+      </div>
     </div>
   );
 }
 
-export { BuildPanel };
+export { BuildPanel, TabBar };
