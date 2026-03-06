@@ -1,79 +1,118 @@
 # Unified Terminal — Project State
 
-## Current Phase: 11 (Classification Layer) -- COMPLETE
-## Current Plan: 1 of 1 (DONE)
-## Last Completed: 11-01-PLAN.md (Classification Layer Foundation)
+## Current Phase: 12 (File-Based Progress Monitor)
+## Current Plan: 1 of 6 (COMPLETE)
+## Last Completed: 12-01 (Project Scaffolding & Transposition Layer)
 ## Status: MILESTONE v2.0 IN PROGRESS
-## Mode: READY FOR PHASE 12
+## Mode: PHASE 12 EXECUTION IN PROGRESS
 
 Phase progress tracked in `.planning/phases/` directories and `ROADMAP.md`.
 
 ---
 
-## Milestone v2.0: Primary Input Architecture
+## Milestone v2.0: Progress Monitor Architecture
 
-### Goal
-Replace parasitic ChatGPT interceptor pattern with Kenoki-first primary input. User intent enters through OUR UI with explicit path selection.
+### Paradigm Shift (2026-03-06)
 
-### Key Changes
-- 4 explicit entry paths: Build | Chat | Existing | Quick
-- Project type classifier (cheap agent, ~200 tokens)
-- Capability registry mapping project types to skills/MCPs
-- Brief templates with targeted questions
-- Brief validator (hard rail)
-- Conductor refactored to receive complete briefs
+**OLD (V1 — DEAD):** Chat mirror — replicate ChatGPT UI, BriefQuestionnaire, streaming tokens
+**NEW (V2 — ACTIVE):** Progress monitor — user sees progress tree + output files, never LLM interface
+
+### Key Decisions
+
+1. **No chat UI replication** — User doesn't see LLM output
+2. **Two file worlds** — Agent (hidden ~/.kenoki/) + Human (visible ~/Documents/Kenoki/)
+3. **File-based transposition** — chokidar watches agent folder, copies to human folder
+4. **4 simple screens** — Home → Progress → Complete + ActionOverlay
+5. **5 IPC channels** — project:update, project:progress, project:file, project:action, project:complete
+6. **Dead code removal** — ChatInterface.tsx, ProfilePicker.tsx, ProviderScreen.tsx
 
 ### Phase Status
 
 | Phase | Status | Description |
 |-------|--------|-------------|
-| 11 | **Complete** | Classification Layer |
-| 12 | Not Started | Brief System |
-| 13 | Not Started | Entry Router & Orchestration |
-| 14 | Not Started | UI Components |
-| 15 | Not Started | Conductor Refactor |
-| 16 | Not Started | Integration & Migration |
+| 11 | **Complete** | Classification Layer (local-classifier.ts, capability-registry) |
+| 12 | **In Progress** | File-Based Progress Monitor (1/6 plans complete) |
+
+---
+
+## Architecture Spec Location
+
+`.planning/architecture/v2-progress-monitor/`
+- `INDEX.md` — Quick links, summary, success criteria
+- `OVERVIEW.md` — Paradigm shift, 4 screens, two file worlds
+- `MIGRATION.md` — What stays/dies, migration steps
+- `VARIABLES.md` — All {{placeholders}}, JSON schemas, data flows
 
 ---
 
 ## v1.0 Final State (Archived)
 
-- **New files created:** 28
-- **Total lines added:** ~6,000
-- **TypeScript errors:** 0
-- **Unit tests:** 444+ passing
-- **Integration tests:** 23/23 passing
-- **E2E tests:** 10/10 passing
-- **Compatibility tests:** 4/4 passing
-- **Production readiness:** 13/13 checks passing
 - **Total tests:** 480+ passing
-- **Production readiness criteria:** 16/16 PASS
+- **Production readiness:** 16/16 PASS
 - **Score:** 95/100
-- **Known gaps:** 0 open (6/6 resolved)
 
 ---
 
-## Key Decisions (v2.0)
+## What Stays (Hidden from User)
 
-- Classifier returns PRIMARY + ADDONS (blended classification)
-- Brief validator is HARD RAIL (no incomplete briefs to Conductor)
-- Feature flag migration (new flow alongside old)
-- Chat pass-through still available via "Just Chat" path
-- Existing path requires codebase mapper analysis first
+- BrowserView (headless for DALL-E, search)
+- DOM injection/capture (framework internal)
+- Conductor (classification, DAG generation)
+- All adapters, enforcement, spine, bodyguard
+- CLI processes (background)
+
+## What Dies
+
+- ChatInterface.tsx
+- ProfilePicker.tsx
+- ProviderScreen.tsx
+- Chat streaming display
+- Conversation history UI
+
+## What's New (Phase 12)
+
+- `~/.kenoki/projects/` folder structure
+- `~/Documents/Kenoki/` user-visible output
+- `src/main/project-scaffold.ts`
+- `src/main/file-bridge.ts` (chokidar watcher)
+- `src/main/transposer.ts` (technical → human translation)
+- `src/renderer/screens/HomeScreen.tsx`
+- `src/renderer/screens/ProgressScreen.tsx`
+- `src/renderer/screens/CompleteScreen.tsx`
+- `src/renderer/components/ActionOverlay.tsx`
 
 ---
 
-## Quick Reference
+## Phase 11 Stats
 
-**Planning Docs:**
-- `/docs/ARCHITECTURE_REFACTOR_PLAN.md` — Detailed implementation plan
-- `/.planning/REQUIREMENTS.md` — v2.0 requirements
-- `/.planning/ROADMAP.md` — Phase-by-phase breakdown
-
-**Phase 11 Stats:**
 - 4 new files created (~580 lines)
 - 29 unit tests passing
 - Commit: de1b44e
 
-**Next Action:**
-Run `/gsd:plan-phase 12` to create Brief System plan
+---
+
+## Phase 12 Progress
+
+### Completed Plans
+
+**12-01: Project Scaffolding & Transposition Layer** (2026-03-06)
+- Files: project-scaffold.ts (164 lines), transposer.ts (266 lines)
+- Commits: b94c835, e5ea95b
+- Duration: 1 minute
+- Summary: `.planning/phases/12-progress-monitor/12-01-SUMMARY.md`
+
+### Key Decisions
+
+1. **Dual folder fallback strategy** — Primary `~/Documents/Kenoki/`, fallback to `~/Desktop/Kenoki/` on permission errors
+2. **Translation dictionaries as constants** — Exported for reusability across modules (5 dictionaries: roles, phases, statuses, MCPs, project types)
+3. **Simple spine parsing** — Regex-based parser for markdown, no external library needed
+
+---
+
+## Next Action
+
+Run `/gsd:execute-phase 12` to continue Phase 12 plans
+
+**Wave 1 (parallel):** ~~12-01~~ ✅ + 12-02 — Backend foundation
+**Wave 2 (parallel):** 12-03 + 12-04 — Frontend screens + overlay
+**Wave 3 (sequential):** 12-05 then 12-06 — Wiring + cleanup
