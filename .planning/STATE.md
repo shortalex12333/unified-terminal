@@ -1,8 +1,8 @@
 # Unified Terminal — Project State
 
 ## Current Phase: 12 (File-Based Progress Monitor)
-## Current Plan: 1 of 6 (COMPLETE)
-## Last Completed: 12-01 (Project Scaffolding & Transposition Layer)
+## Current Plan: 2 of 6 (COMPLETE)
+## Last Completed: 12-02 (File Bridge & IPC Integration)
 ## Status: MILESTONE v2.0 IN PROGRESS
 ## Mode: PHASE 12 EXECUTION IN PROGRESS
 
@@ -101,11 +101,20 @@ Phase progress tracked in `.planning/phases/` directories and `ROADMAP.md`.
 - Duration: 1 minute
 - Summary: `.planning/phases/12-progress-monitor/12-01-SUMMARY.md`
 
+**12-02: File Bridge & IPC Integration** (2026-03-06)
+- Files: file-bridge.ts (362 lines), global.d.ts (+45 lines)
+- Commits: 112d86b, 5005bf5
+- Duration: 2 minutes
+- Summary: `.planning/phases/12-progress-monitor/12-02-SUMMARY.md`
+
 ### Key Decisions
 
 1. **Dual folder fallback strategy** — Primary `~/Documents/Kenoki/`, fallback to `~/Desktop/Kenoki/` on permission errors
 2. **Translation dictionaries as constants** — Exported for reusability across modules (5 dictionaries: roles, phases, statuses, MCPs, project types)
 3. **Simple spine parsing** — Regex-based parser for markdown, no external library needed
+4. **chokidar stability threshold** — 100ms stabilityThreshold with 50ms pollInterval to prevent partial file reads
+5. **Workspace path mapping** — Extract path after `/workspace/`, map to flat `Files/` folder for simplicity
+6. **5 distinct IPC channels** — Separate channels for update/progress/file/action/complete instead of single discriminated union
 
 ---
 
@@ -113,6 +122,6 @@ Phase progress tracked in `.planning/phases/` directories and `ROADMAP.md`.
 
 Run `/gsd:execute-phase 12` to continue Phase 12 plans
 
-**Wave 1 (parallel):** ~~12-01~~ ✅ + 12-02 — Backend foundation
+**Wave 1 (parallel):** ~~12-01~~ ✅ + ~~12-02~~ ✅ — Backend foundation COMPLETE
 **Wave 2 (parallel):** 12-03 + 12-04 — Frontend screens + overlay
 **Wave 3 (sequential):** 12-05 then 12-06 — Wiring + cleanup
