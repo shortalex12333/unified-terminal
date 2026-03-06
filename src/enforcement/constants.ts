@@ -287,7 +287,7 @@ export const TIER_CLASSIFICATION = {
     timeRange: "5-30 min",
     agents: "3-7",
     overhead: "15-30s per step",
-    actors: ["worker", "bodyguard", "scope", "skill_injector", "pa_on_handoff", "context_warden"],
+    actors: ["worker", "bodyguard", "scope", "skill_injector", "pa_on_handoff", "context_warden", "curious_monkey"],
     examples: ["Add contact form", "Set up Stripe", "Create admin page"],
   },
   TIER_3: {
@@ -295,8 +295,59 @@ export const TIER_CLASSIFICATION = {
     timeRange: "30+ min",
     agents: "8-15",
     overhead: "2-4 min total (6-9% of task)",
-    actors: ["conductor", "worker", "bodyguard", "scope", "skill_injector", "pa", "context_warden", "archivist"],
+    actors: ["conductor", "worker", "bodyguard", "scope", "skill_injector", "pa", "context_warden", "curious_monkey", "archivist"],
     examples: ["Build candle store", "SaaS dashboard with auth", "Portfolio with CMS"],
+  },
+};
+
+// ============================================================================
+// CURIOUS MONKEY CONSTANTS — Slop detection and question refinement
+// Source: PA-SPINE-INTEGRATION/BIDIRECTIONAL-FLOW-AND-CURIOSITY-AGENT.md
+// ============================================================================
+
+export const CURIOUS_MONKEY = {
+  // Polling interval for sub-spine observation
+  OBSERVATION_INTERVAL_MS: 30_000, // 30 seconds
+
+  // Minimum confidence to report detection to PA
+  MIN_DETECTION_CONFIDENCE: 0.6,
+
+  // Buzzword density threshold (per 100 words)
+  BUZZWORD_DENSITY_THRESHOLD: 3,
+
+  // How long before auto-skipping unanswered questions
+  QUESTION_AUTO_SKIP_MS: 60_000, // 60 seconds
+
+  // Max questions to surface at once (prevent question fatigue)
+  MAX_CONCURRENT_QUESTIONS: 3,
+
+  // Patterns that indicate generic/slop output
+  SLOP_PATTERNS: {
+    GENERIC_LANGUAGE: [
+      "professional website",
+      "user-friendly interface",
+      "modern design",
+      "clean design",
+      "cutting-edge",
+      "best practices",
+      "seamless experience",
+      "intuitive interface",
+      "robust solution",
+    ],
+    MEANINGLESS_MODIFIERS: [
+      "very",
+      "really",
+      "extremely",
+      "highly",
+      "incredibly",
+    ],
+  },
+
+  // File paths (relative to .kenoki/)
+  PATHS: {
+    DETECTIONS: "monkey/detections.jsonl",
+    PATTERNS: "monkey/patterns.jsonl",
+    CONFIG: "monkey/config.json",
   },
 };
 

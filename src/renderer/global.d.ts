@@ -891,6 +891,46 @@ declare interface ElectronAPI {
     /** Listen for MCP connection required during build */
     onConnectionRequired: (callback: (event: MCPConnectionRequiredEvent) => void) => () => void;
   };
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Progress Monitor IPC channels (V2 — File-Based Architecture)
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /** Progress Monitor API for V2 file-based transposition architecture */
+  project?: {
+    /** Listen for status updates (agent working, almost done, finished) */
+    onUpdate: (callback: (data: { type: string; message: string }) => void) => () => void;
+
+    /** Listen for progress tree updates (phase status changes) */
+    onProgress: (callback: (data: { phases: Array<{ name: string; status: 'done' | 'active' | 'pending' }>; percentage: number }) => void) => () => void;
+
+    /** Listen for file created/modified events */
+    onFile: (callback: (data: { name: string; path: string; canPreview: boolean; canOpen: boolean }) => void) => () => void;
+
+    /** Listen for user action required (MCP connection, circuit breaker) */
+    onAction: (callback: (data: {
+      type: 'mcp' | 'circuit';
+      title: string;
+      message: string;
+      actions: Array<{ label: string; action: string }>;
+    }) => void) => () => void;
+
+    /** Listen for project completion */
+    onComplete: (callback: (data: {
+      humanFolder: string;
+      deployedUrl?: string;
+      summary: { pages: number; components: number };
+    }) => void) => () => void;
+
+    /** Open a folder in Finder/Explorer */
+    openFolder: (path: string) => Promise<void>;
+
+    /** Open a file with default application */
+    openFile: (path: string) => Promise<void>;
+
+    /** Open a URL in default browser */
+    openUrl: (url: string) => Promise<void>;
+  };
 }
 
 declare global {
