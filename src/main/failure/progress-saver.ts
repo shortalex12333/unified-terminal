@@ -2,7 +2,7 @@ import { EventEmitter } from 'events';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { SavedProgress, PartialOutput, FailureReason, serializeSavedProgress, deserializeSavedProgress } from './types';
+import { SavedProgress, PartialOutput, FailureReason, serializeSavedProgress, deserializeSavedProgress, detectFailureReason } from './types';
 
 const KENOKI_DIR = path.join(os.homedir(), '.kenoki');
 const SAVED_PROGRESS_DIR = path.join(KENOKI_DIR, 'saved-progress');
@@ -24,10 +24,49 @@ export class ProgressSaver extends EventEmitter {
     return ProgressSaver.instance;
   }
 
-  async save(data: { planId: string; planName: string; projectPath: string; completedSteps: number[]; totalSteps: number; failedStep: number; failureReason: FailureReason; failureMessage: string; }): Promise<SavedProgress> {
+  async save(data: {
+    planId: string;
+    projectPath: string;
+    projectName?: string;
+    planName?: string;
+    steps?: Array<{ id: number; status: string }>;
+    completedSteps?: number[];
+    totalSteps?: number;
+    failedStepId?: number;
+    failedStep?: number;
+    error?: string;
+    failureReason?: FailureReason;
+    failureMessage?: string;
+    originalMessage?: string;
+    context?: Record<string, unknown>;
+  }): Promise<SavedProgress> {
     const id = 'progress_' + Date.now() + '_' + Math.random().toString(36).substring(2, 8);
     const partialOutputs = await this.scanPartialOutputs(data.projectPath);
-    const progress: SavedProgress = { id, ...data, savedAt: new Date(), canResume: this.checkCanResume(data.failureReason), partialOutputs };
+
+    // Convert steps array to completed steps if provided
+    const completedSteps = data.completedSteps ||
+      (data.steps?.filter(s => s.status === 'done').map(s => s.id) ?? []);
+    const totalSteps = data.totalSteps || data.steps?.length || 0;
+    const failedStep = data.failedStep ?? data.failedStepId ?? 0;
+    const failureMessage = data.failureMessage || data.error || 'Unknown error';
+    const failureReason = data.failureReason || detectFailureReason(failureMessage);
+    const planName = data.planName || data.projectName || 'Untitled Build';
+
+    const progress: SavedProgress = {
+      id,
+      planId: data.planId,
+      planName,
+      projectPath: data.projectPath,
+      completedSteps,
+      totalSteps,
+      failedStep,
+      failureReason,
+      failureMessage,
+      savedAt: new Date(),
+      canResume: this.checkCanResume(failureReason),
+      partialOutputs,
+    };
+
     const filePath = path.join(SAVED_PROGRESS_DIR, id + '.json');
     fs.writeFileSync(filePath, JSON.stringify(serializeSavedProgress(progress), null, 2));
     this.emit('saved', progress);

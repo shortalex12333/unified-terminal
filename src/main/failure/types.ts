@@ -66,3 +66,31 @@ export function getFailureReasonLabel(reason: FailureReason): string {
   };
   return labels[reason];
 }
+
+export function detectFailureReason(errorMessage: string): FailureReason {
+  const msg = errorMessage.toLowerCase();
+
+  if (msg.includes('rate limit') || msg.includes('too many requests') || msg.includes('429')) {
+    return 'rate_limited';
+  }
+  if (msg.includes('timeout') || msg.includes('timed out')) {
+    return 'timeout';
+  }
+  if (msg.includes('network') || msg.includes('econnrefused') || msg.includes('enotfound')) {
+    return 'network_error';
+  }
+  if (msg.includes('unavailable') || msg.includes('503') || msg.includes('502')) {
+    return 'api_unavailable';
+  }
+  if (msg.includes('subscription') || msg.includes('payment') || msg.includes('billing')) {
+    return 'subscription_expired';
+  }
+  if (msg.includes('permission') || msg.includes('forbidden') || msg.includes('403')) {
+    return 'permission_denied';
+  }
+  if (msg.includes('disk') || msg.includes('space') || msg.includes('enospc')) {
+    return 'disk_full';
+  }
+
+  return 'unknown';
+}
