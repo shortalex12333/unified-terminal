@@ -1550,7 +1550,11 @@ ipcMain.handle('cli:translate', async (
 /**
  * IPC: Send message to conductor for classification and execution.
  * This is the primary input path for Kenoki.
+ *
+ * MVP: Uses local classifier (no API needed) instead of Codex.
  */
+import { classifyLocally } from './local-classifier';
+
 ipcMain.handle('conductor:send', async (event, message: string): Promise<void> => {
   console.log('[IPC] conductor:send called:', message.substring(0, 50) + '...');
   const window = BrowserWindow.fromWebContents(event.sender);
@@ -1562,27 +1566,37 @@ ipcMain.handle('conductor:send', async (event, message: string): Promise<void> =
       message: 'Analyzing your request...',
     });
 
-    // Get conductor and classify the message
-    const conductor = getConductor();
-    const plan = await conductor.classify(message);
+    // Use local classifier (no API needed for MVP)
+    const classification = classifyLocally(message);
+    console.log('[IPC] Local classification:', classification);
 
-    console.log('[IPC] Conductor plan:', plan);
-
-    // Notify UI about the plan
+    // Notify UI about the classification
     window?.webContents.send('conductor:status', {
       status: 'executing',
-      message: `Executing ${plan.plan.length} step(s)...`,
+      message: `Identified: ${classification.projectType} project`,
     });
 
-    // For now, send back the plan as a response
-    // TODO: Actually execute via StepScheduler and stream results
-    const planSummary = plan.plan.map((step, i) =>
-      `${i + 1}. [${step.target}] ${step.action}: ${step.detail}`
-    ).join('\n');
+    // Build response showing what we understood
+    const response = `**Project Analysis**
+
+Type: ${classification.projectType.toUpperCase()}
+Goal: ${classification.extractedGoal}
+Suggested name: ${classification.suggestedName}
+Route: ${classification.route}
+Confidence: ${Math.round(classification.confidence * 100)}%
+
+**Skills needed:**
+${classification.skills.length > 0 ? classification.skills.map(s => `- ${s}`).join('\n') : '- (none identified)'}
+
+---
+
+*Ready to execute via ${classification.route === 'cli' ? 'Claude Code / Codex' : 'web interface'}*
+
+**Next step:** Wire up actual CLI execution to build this project.`;
 
     window?.webContents.send('conductor:output', {
       type: 'chunk',
-      content: `Plan created (${plan.complexity}):\n\n${planSummary}\n\n`,
+      content: response,
     });
 
     // Mark complete
