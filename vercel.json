@@ -3,10 +3,5 @@
   "builds": [
     { "src": "KENOKI_LANDING_PAGE/package.json", "use": "@vercel/static-build", "config": { "distDir": "dist" } },
     { "src": "KENOKI_LANDING_PAGE/api/**/*.js", "use": "@vercel/node" }
-  ],
-  "routes": [
-    { "src": "/api/(.*)", "dest": "KENOKI_LANDING_PAGE/api/$1.js" },
-    { "handle": "filesystem" },
-    { "src": "/.*", "dest": "/index.html" }
   ]
 }
