@@ -354,6 +354,90 @@ mockModule(path.resolve(srcDir, 'glue', 'index.ts'), {
   }),
 });
 
+// --- Mock: src/storekeeper/types.ts ---
+mockModule(path.resolve(srcDir, 'storekeeper', 'types.ts'), {
+  STOREKEEPER_CONSTANTS: {
+    KENOKI_DIR: '.kenoki',
+    REQUESTS_DIR: 'requests',
+    RESPONSES_DIR: 'responses',
+    AUDIT_DIR: 'audit',
+    INVENTORY_DIR: 'inventory',
+    PROCESSING_TIMEOUT_MS: 10_000,
+    MAX_SKILLS_ABSOLUTE: 5,
+    MAX_SKILL_TOKENS: 4_000,
+    FOUNDATION_SKILLS: [],
+  },
+});
+
+// --- Mock: src/storekeeper/provision.ts ---
+mockModule(path.resolve(srcDir, 'storekeeper', 'provision.ts'), {
+  provision: () => ({
+    foundation: [],
+    perStep: new Map(),
+    plugins: [],
+    mcps: [],
+    audit: [],
+  }),
+});
+
+// --- Mock: src/storekeeper/storekeeper.ts ---
+const mockStorekeeperInstance = {
+  processRequest: async () => ({ status: 'READY', approvedSkills: [], deniedSkills: [], approvedMcp: [], deniedMcp: [], approvedPlugins: [], injectionSummary: {} }),
+  buildContext: async () => ({ assembledPrompt: '', mcp: {}, plugin: '', config: {}, meta: {} }),
+  cleanupStep: async () => {},
+  reloadInventory: () => {},
+};
+mockModule(path.resolve(srcDir, 'storekeeper', 'storekeeper.ts'), {
+  Storekeeper: class {},
+  getStorekeeper: () => mockStorekeeperInstance,
+  resetStorekeeper: () => {},
+});
+
+// --- Mock: src/storekeeper/approval-engine.ts ---
+mockModule(path.resolve(srcDir, 'storekeeper', 'approval-engine.ts'), { processApproval: () => ({ status: 'READY' }) });
+
+// --- Mock: src/storekeeper/inventory.ts ---
+mockModule(path.resolve(srcDir, 'storekeeper', 'inventory.ts'), { loadInventory: () => ({ skills: [], mcp: [], plugins: [] }), findSkill: () => undefined, findMcp: () => undefined, findPlugin: () => undefined, getTotalTokens: () => 0 });
+
+// --- Mock: src/storekeeper/injector.ts ---
+mockModule(path.resolve(srcDir, 'storekeeper', 'injector.ts'), { injectTools: () => ({}), buildExecutionContext: () => ({}) });
+
+// --- Mock: src/storekeeper/cleanup.ts ---
+mockModule(path.resolve(srcDir, 'storekeeper', 'cleanup.ts'), { cleanupStep: () => ({}), cleanupAll: () => 0, registerContext: () => {} });
+
+// --- Mock: src/storekeeper/audit.ts ---
+mockModule(path.resolve(srcDir, 'storekeeper', 'audit.ts'), { writeCheckoutLog: () => '', logRequest: () => {}, logResponse: () => {} });
+
+// --- Mock: src/storekeeper/request-parser.ts ---
+mockModule(path.resolve(srcDir, 'storekeeper', 'request-parser.ts'), { parseRequest: () => null, createRequest: () => ({}) });
+
+// --- Mock: src/storekeeper/watcher.ts ---
+mockModule(path.resolve(srcDir, 'storekeeper', 'watcher.ts'), { StorekeeperWatcher: class {}, getStorekeeperWatcher: () => ({}) });
+
+// --- Mock: src/storekeeper/index.ts (barrel) ---
+mockModule(path.resolve(srcDir, 'storekeeper', 'index.ts'), {
+  provision: () => ({
+    foundation: [],
+    perStep: new Map(),
+    plugins: [],
+    mcps: [],
+    audit: [],
+  }),
+  getStorekeeper: () => mockStorekeeperInstance,
+  resetStorekeeper: () => {},
+  STOREKEEPER_CONSTANTS: {
+    KENOKI_DIR: '.kenoki',
+    REQUESTS_DIR: 'requests',
+    RESPONSES_DIR: 'responses',
+    AUDIT_DIR: 'audit',
+    INVENTORY_DIR: 'inventory',
+    PROCESSING_TIMEOUT_MS: 10_000,
+    MAX_SKILLS_ABSOLUTE: 5,
+    MAX_SKILL_TOKENS: 4_000,
+    FOUNDATION_SKILLS: [],
+  },
+});
+
 // ============================================================================
 // IMPORTS (after mocking)
 // ============================================================================

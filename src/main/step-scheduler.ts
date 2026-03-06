@@ -24,6 +24,10 @@ import { CIRCUIT_BREAKER, ENFORCER_RETRY_POLICIES } from '../enforcement/constan
 import { selectSkills, validateSelection, parseVerifyBlock, getChecksForSkill, executeVerifyCommand, isCommandAllowed } from '../skills';
 import type { SkillSelection } from '../skills';
 
+// Storekeeper (Plan-level tool provisioning + runtime checkout)
+import { provision, getStorekeeper } from '../storekeeper';
+import type { ToolManifest, ExecutionContext as StorekeeperContext, ToolRequest } from '../storekeeper';
+
 // Glue Layer (Phase 4/5: prompt assembly + result normalization)
 import { assemblePrompt } from '../glue/assemble-prompt';
 import { normalize } from '../glue/normalizer';
@@ -322,9 +326,20 @@ export class StepScheduler extends EventEmitter {
       });
     }
 
+    // Plan-level tool provisioning via storekeeper
+    let manifest: ToolManifest | null = null;
+    try {
+      const skillsBasePath = path.resolve(__dirname, '../../resources/skills');
+      const catalogPath = path.join(skillsBasePath, 'trigger-map.json');
+      manifest = provision({ plan, catalogPath, skillsBasePath, planTier: tier });
+      console.log(`[StepScheduler] Storekeeper provisioned: ${manifest.foundation.length} foundation, ${manifest.perStep.size} step entries, ${manifest.plugins.length} plugins`);
+    } catch (err) {
+      console.warn('[StepScheduler] Storekeeper provision failed (falling back to per-step selection):', err);
+    }
+
     // Execute the DAG
     try {
-      await this.executeDAG(plan.context);
+      await this.executeDAG(plan.context, manifest);
     } catch (error) {
       console.error('[StepScheduler] Plan execution error:', error);
     }
@@ -477,7 +492,7 @@ export class StepScheduler extends EventEmitter {
    * Execute steps respecting DAG dependencies.
    * MVP: Sequential execution (one step at a time).
    */
-  private async executeDAG(context?: Record<string, any>): Promise<void> {
+  private async executeDAG(context?: Record<string, any>, manifest?: ToolManifest | null): Promise<void> {
     while (!this.stopped) {
       // Find steps ready to execute (all dependencies done/skipped)
       const readySteps = this.getReadySteps();
@@ -501,12 +516,12 @@ export class StepScheduler extends EventEmitter {
       // MVP: Execute one step at a time (sequential)
       // TODO: For parallel execution, execute all readySteps concurrently
       const step = readySteps[0];
-      await this.executeStep(step, context);
+      await this.executeStep(step, context, manifest);
 
       // If step needs user decision, wait for it
       if (step.status === 'needs_user') {
         const decision = await this.askUser(step);
-        await this.handleUserDecision(step, decision, context);
+        await this.handleUserDecision(step, decision, context, manifest);
       }
 
       // Report progress and potentially get re-plan
@@ -581,7 +596,8 @@ export class StepScheduler extends EventEmitter {
    */
   private async executeStep(
     step: RuntimeStep,
-    context?: Record<string, any>
+    context?: Record<string, any>,
+    manifest?: ToolManifest | null,
   ): Promise<void> {
     console.log(`[StepScheduler] Executing step ${step.id}: ${step.action}`);
     devLog.scheduler('info', `Step ${step.id}: ${step.action}`, step.detail);
@@ -668,30 +684,38 @@ export class StepScheduler extends EventEmitter {
       }
 
       // ====================================================================
-      // STEP 2: SKILL SELECTION
+      // STEP 2: SKILL SELECTION (storekeeper manifest or per-step fallback)
       // ====================================================================
       this.emitProgress(step, 10, 'Selecting skills...');
       let skillSelection: SkillSelection = { skills: [], reasoning: 'No skills selected' };
       const skillsBasePath = path.resolve(__dirname, '../../resources/skills');
       const catalogPath = path.join(skillsBasePath, 'trigger-map.json');
 
-      try {
-        const stepTier = step.target === 'service' ? 0 : step.target === 'cli' ? 2 : 1;
-        const rawSelection = await selectSkills({
-          stepAction: step.action,
-          stepDetail: step.detail,
-          spineSummary: preSpine?.changesSummary || '',
-          tier: stepTier,
-        }, catalogPath);
+      if (manifest) {
+        // Plan-level provisioning: use storekeeper manifest
+        const stepSkills = manifest.perStep.get(step.id) || [];
+        const allSkills = [...new Set([...manifest.foundation, ...stepSkills])];
+        skillSelection = { skills: allSkills, reasoning: '[storekeeper]' };
+      } else {
+        // Fallback: existing per-step selection (selectSkills + validateSelection)
+        try {
+          const stepTier = step.target === 'service' ? 0 : step.target === 'cli' ? 2 : 1;
+          const rawSelection = await selectSkills({
+            stepAction: step.action,
+            stepDetail: step.detail,
+            spineSummary: preSpine?.changesSummary || '',
+            tier: stepTier,
+          }, catalogPath);
 
-        // Validate selection against hard rails
-        const validated = validateSelection(rawSelection, skillsBasePath, stepTier);
-        skillSelection = {
-          skills: validated.skills.map(s => path.join(skillsBasePath, s)),
-          reasoning: rawSelection.reasoning,
-        };
-      } catch (err) {
-        console.warn(`[StepScheduler] Skill selection failed (non-fatal):`, err);
+          // Validate selection against hard rails
+          const validated = validateSelection(rawSelection, skillsBasePath, stepTier);
+          skillSelection = {
+            skills: validated.skills.map(s => path.join(skillsBasePath, s)),
+            reasoning: rawSelection.reasoning,
+          };
+        } catch (err) {
+          console.warn(`[StepScheduler] Skill selection failed (non-fatal):`, err);
+        }
       }
 
       // ====================================================================
@@ -896,6 +920,14 @@ export class StepScheduler extends EventEmitter {
       // Emit step done event to Status Agent
       schedulerEvents.stepDone(step.id, step.action);
 
+      // Return tools to storekeeper
+      try {
+        const storekeeper = getStorekeeper();
+        await storekeeper.cleanupStep(String(step.id), 'success');
+      } catch (err) {
+        console.warn(`[StepScheduler] Storekeeper cleanup failed (non-fatal):`, err);
+      }
+
       // Update completed step count for progress checkpoint
       this.completedStepCount++;
 
@@ -941,7 +973,14 @@ export class StepScheduler extends EventEmitter {
       }
 
     } catch (error) {
-      // Failed
+      // Failed — cleanup storekeeper first
+      try {
+        const storekeeper = getStorekeeper();
+        await storekeeper.cleanupStep(String(step.id), 'failure');
+      } catch (cleanupErr) {
+        console.warn(`[StepScheduler] Storekeeper failure cleanup failed (non-fatal):`, cleanupErr);
+      }
+
       step.retryCount++;
       step.error = error instanceof Error ? error.message : String(error);
 
@@ -1046,7 +1085,8 @@ export class StepScheduler extends EventEmitter {
   private async handleUserDecision(
     step: RuntimeStep,
     decision: UserDecision,
-    context?: Record<string, any>
+    context?: Record<string, any>,
+    manifest?: ToolManifest | null,
   ): Promise<void> {
     console.log(`[StepScheduler] User decision for step ${step.id}: ${decision}`);
 
@@ -1056,7 +1096,7 @@ export class StepScheduler extends EventEmitter {
         step.retryCount = 0;
         step.status = 'pending';
         step.error = undefined;
-        await this.executeStep(step, context);
+        await this.executeStep(step, context, manifest);
         break;
 
       case 'skip':
