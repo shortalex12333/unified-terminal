@@ -1,8 +1,8 @@
 # Unified Terminal — Project State
 
 ## Current Phase: 12 (File-Based Progress Monitor)
-## Current Plan: 4 of 6 (COMPLETE)
-## Last Completed: 12-04 (ActionOverlay & Status Files)
+## Current Plan: 5 of 6 (COMPLETE)
+## Last Completed: 12-05 (Final Integration - Wiring)
 ## Status: MILESTONE v2.0 IN PROGRESS
 ## Mode: PHASE 12 EXECUTION IN PROGRESS
 
@@ -119,6 +119,12 @@ Phase progress tracked in `.planning/phases/` directories and `ROADMAP.md`.
 - Duration: 2 minutes
 - Summary: `.planning/phases/12-progress-monitor/12-04-SUMMARY.md`
 
+**12-05: Final Integration - Wiring** (2026-03-06)
+- Files: App.tsx (+82 lines), preload.ts (+57 lines), index.ts (+97 lines), global.d.ts (+6 lines)
+- Commits: b1c790f, ce7180e, 8daf667
+- Duration: 4 minutes
+- Summary: `.planning/phases/12-progress-monitor/12-05-SUMMARY.md`
+
 ### Key Decisions
 
 1. **Dual folder fallback strategy** — Primary `~/Documents/Kenoki/`, fallback to `~/Desktop/Kenoki/` on permission errors
@@ -129,6 +135,9 @@ Phase progress tracked in `.planning/phases/` directories and `ROADMAP.md`.
 6. **5 distinct IPC channels** — Separate channels for update/progress/file/action/complete instead of single discriminated union
 7. **Status file merge strategy** — Read existing file → merge with new status → write to prevent race conditions and data loss
 8. **Traffic light status metaphor** — GREEN (active), AMBER (progress > 70%), RED (done) for intuitive status representation
+9. **Project naming from prompt** — First 50 chars of prompt sanitized for filesystem as project name
+10. **FileBridge singleton pattern** — Module-level variable with stop-then-start for single active instance
+11. **Shell module integration** — All external open operations (folder/file/URL) use Electron shell for consistency
 
 ---
 
@@ -138,4 +147,9 @@ Run `/gsd:execute-phase 12` to continue Phase 12 plans
 
 **Wave 1 (parallel):** ~~12-01~~ ✅ + ~~12-02~~ ✅ — Backend foundation COMPLETE
 **Wave 2 (parallel):** ~~12-03~~ ✅ + ~~12-04~~ ✅ — Frontend screens + overlay COMPLETE
-**Wave 3 (sequential):** 12-05 then 12-06 — Wiring + cleanup
+**Wave 3 (sequential):** ~~12-05~~ ✅ then 12-06 — Wiring COMPLETE + cleanup remaining
+
+## Last Session
+
+**Timestamp:** 2026-03-06 20:08:36 UTC
+**Stopped At:** Completed 12-05-PLAN.md (Final Integration - Wiring)
