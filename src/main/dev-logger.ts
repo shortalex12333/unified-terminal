@@ -1,47 +1,60 @@
 /**
- * Development Logger - Streams backend events to renderer's Developer Console
+ * Backend Terminal Logger - Streams raw CLI content to renderer
  *
- * This module captures:
- * - CLI process spawns and output
- * - Conductor classification and DAG decisions
- * - Step scheduler events
- * - MCP connection status
+ * Shows the actual CLI terminal experience:
+ * - Agent spawns (Codex, Claude Code, etc.)
+ * - Prompts being sent (stdin)
+ * - Raw output streams (stdout/stderr)
+ * - Process lifecycle events
  *
- * Only active when DEV_MODE is enabled.
+ * This is for creators to see exactly what's happening with backend agents.
  */
 
 import { BrowserWindow } from 'electron';
 
-type LogSource = 'cli' | 'conductor' | 'scheduler' | 'mcp' | 'system';
-type LogLevel = 'info' | 'warn' | 'error' | 'debug' | 'success';
+// =============================================================================
+// TYPES
+// =============================================================================
 
-interface DevLogEntry {
-  source: LogSource;
-  level: LogLevel;
-  message: string;
-  details?: string;
-}
-
-interface CLIProcessEvent {
-  action: 'start' | 'end';
+export interface TerminalLine {
   id: string;
-  command: string;
+  timestamp: Date;
+  sessionId: string;
+  type: 'spawn' | 'stdin' | 'stdout' | 'stderr' | 'exit' | 'system';
+  content: string;
+  tool?: string;
   pid?: number;
-  success?: boolean;
+  exitCode?: number;
 }
 
-class DevLogger {
-  private static instance: DevLogger | null = null;
+export interface AgentSession {
+  id: string;
+  tool: string;
+  command: string;
+  args: string[];
+  pid?: number;
+  startedAt: Date;
+  endedAt?: Date;
+  status: 'running' | 'done' | 'failed';
+}
+
+// =============================================================================
+// BACKEND TERMINAL LOGGER
+// =============================================================================
+
+class BackendTerminal {
+  private static instance: BackendTerminal | null = null;
   private mainWindow: BrowserWindow | null = null;
-  private enabled = true; // Always enabled for now; can be toggled
+  private enabled = true;
+  private sessions: Map<string, AgentSession> = new Map();
 
   private constructor() {}
 
-  static getInstance(): DevLogger {
-    if (!DevLogger.instance) {
-      DevLogger.instance = new DevLogger();
+  static getInstance(): BackendTerminal {
+    if (!BackendTerminal.instance) {
+      BackendTerminal.instance = new BackendTerminal();
     }
-    return DevLogger.instance;
+    return BackendTerminal.instance;
   }
 
   setMainWindow(window: BrowserWindow): void {
@@ -57,67 +70,173 @@ class DevLogger {
   }
 
   /**
-   * Send a log entry to the Developer Console
+   * Send a terminal line to the renderer
    */
-  log(source: LogSource, level: LogLevel, message: string, details?: string): void {
+  private send(line: Omit<TerminalLine, 'id' | 'timestamp'>): void {
     if (!this.enabled || !this.mainWindow) return;
 
-    const entry: DevLogEntry = { source, level, message, details };
+    const fullLine: TerminalLine = {
+      ...line,
+      id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      timestamp: new Date(),
+    };
 
     try {
-      this.mainWindow.webContents.send('dev-log', entry);
+      this.mainWindow.webContents.send('terminal-line', fullLine);
     } catch (err) {
-      // Window might be closed, ignore
-    }
-
-    // Also log to terminal for debugging
-    const prefix = `[DEV:${source.toUpperCase()}]`;
-    if (level === 'error') {
-      console.error(prefix, message, details || '');
-    } else if (level === 'warn') {
-      console.warn(prefix, message, details || '');
-    } else {
-      console.log(prefix, message, details || '');
+      // Window might be closed
     }
   }
 
   /**
-   * Track CLI process lifecycle
+   * Log agent spawn - when a CLI tool is launched
    */
-  cliProcess(event: CLIProcessEvent): void {
-    if (!this.enabled || !this.mainWindow) return;
+  agentSpawn(sessionId: string, tool: string, command: string, args: string[], pid?: number): void {
+    const session: AgentSession = {
+      id: sessionId,
+      tool,
+      command,
+      args,
+      pid,
+      startedAt: new Date(),
+      status: 'running',
+    };
+    this.sessions.set(sessionId, session);
 
-    try {
-      this.mainWindow.webContents.send('cli-process', event);
-    } catch (err) {
-      // Window might be closed, ignore
+    const argsStr = args.length > 0 ? ` ${args.join(' ')}` : '';
+    this.send({
+      sessionId,
+      type: 'spawn',
+      content: `$ ${command}${argsStr}`,
+      tool,
+      pid,
+    });
+
+    // Also notify about session state
+    if (this.mainWindow) {
+      try {
+        this.mainWindow.webContents.send('agent-session', { action: 'start', session });
+      } catch (err) {}
     }
   }
 
-  // Convenience methods for each source
-  cli(level: LogLevel, message: string, details?: string): void {
-    this.log('cli', level, message, details);
+  /**
+   * Log stdin - prompt/input sent to the agent
+   */
+  stdin(sessionId: string, content: string): void {
+    const session = this.sessions.get(sessionId);
+    this.send({
+      sessionId,
+      type: 'stdin',
+      content: content,
+      tool: session?.tool,
+    });
   }
 
-  conductor(level: LogLevel, message: string, details?: string): void {
-    this.log('conductor', level, message, details);
+  /**
+   * Log stdout - agent output
+   */
+  stdout(sessionId: string, content: string): void {
+    const session = this.sessions.get(sessionId);
+    // Don't send empty lines
+    if (!content.trim()) return;
+
+    this.send({
+      sessionId,
+      type: 'stdout',
+      content: content,
+      tool: session?.tool,
+    });
   }
 
-  scheduler(level: LogLevel, message: string, details?: string): void {
-    this.log('scheduler', level, message, details);
+  /**
+   * Log stderr - agent errors/warnings
+   */
+  stderr(sessionId: string, content: string): void {
+    const session = this.sessions.get(sessionId);
+    // Filter out noise
+    if (!content.trim()) return;
+    if (content.includes('Reading prompt from stdin')) return;
+
+    this.send({
+      sessionId,
+      type: 'stderr',
+      content: content,
+      tool: session?.tool,
+    });
   }
 
-  mcp(level: LogLevel, message: string, details?: string): void {
-    this.log('mcp', level, message, details);
+  /**
+   * Log agent exit
+   */
+  agentExit(sessionId: string, exitCode: number, signal?: string): void {
+    const session = this.sessions.get(sessionId);
+    if (session) {
+      session.endedAt = new Date();
+      session.status = exitCode === 0 ? 'done' : 'failed';
+    }
+
+    const statusText = exitCode === 0 ? 'completed' : `failed (code: ${exitCode})`;
+    this.send({
+      sessionId,
+      type: 'exit',
+      content: `Process ${statusText}${signal ? ` [signal: ${signal}]` : ''}`,
+      tool: session?.tool,
+      exitCode,
+    });
+
+    // Notify about session state
+    if (this.mainWindow && session) {
+      try {
+        this.mainWindow.webContents.send('agent-session', { action: 'end', session });
+      } catch (err) {}
+    }
   }
 
-  system(level: LogLevel, message: string, details?: string): void {
-    this.log('system', level, message, details);
+  /**
+   * Log system message (orchestration events)
+   */
+  system(content: string): void {
+    this.send({
+      sessionId: 'system',
+      type: 'system',
+      content,
+    });
+  }
+
+  // ==========================================================================
+  // CONVENIENCE METHODS (for backwards compatibility with devLog pattern)
+  // ==========================================================================
+
+  cli(level: string, message: string, details?: string): void {
+    this.system(`[CLI] ${message}${details ? `: ${details}` : ''}`);
+  }
+
+  conductor(level: string, message: string, details?: string): void {
+    this.system(`[CONDUCTOR] ${message}${details ? `: ${details}` : ''}`);
+  }
+
+  scheduler(level: string, message: string, details?: string): void {
+    this.system(`[SCHEDULER] ${message}${details ? `: ${details}` : ''}`);
+  }
+
+  mcp(level: string, message: string, details?: string): void {
+    this.system(`[MCP] ${message}${details ? `: ${details}` : ''}`);
+  }
+
+  // Legacy cliProcess method
+  cliProcess(event: { action: string; id: string; command: string; pid?: number; success?: boolean }): void {
+    if (event.action === 'start') {
+      this.system(`Starting: ${event.command}`);
+    } else if (event.action === 'end') {
+      this.system(`Finished: ${event.command} (${event.success ? 'success' : 'failed'})`);
+    }
   }
 }
 
 // Export singleton instance
-export const devLog = DevLogger.getInstance();
-export function getDevLogger(): DevLogger {
-  return DevLogger.getInstance();
+export const backendTerminal = BackendTerminal.getInstance();
+export const devLog = backendTerminal; // Alias for backwards compatibility
+export function getDevLogger(): BackendTerminal {
+  return BackendTerminal.getInstance();
 }

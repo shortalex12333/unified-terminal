@@ -2065,66 +2065,86 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // ============================================================================
 
   /**
-   * Developer Console API for backend visibility during staging/testing.
-   * Shows CLI processes, conductor decisions, scheduler events in real-time.
+   * Backend Terminal API for viewing raw CLI/agent activity during staging.
+   * Shows actual terminal content: spawns, prompts, outputs, exits.
    * Users don't see this - it's for the creator during development.
    */
-  devConsole: {
+  backendTerminal: {
     /**
-     * Listen for dev log entries from backend.
-     * Receives CLI output, conductor decisions, scheduler events, etc.
+     * Listen for terminal lines (raw stdin/stdout/stderr from agents).
+     * This is the actual CLI content, not formatted logs.
      */
-    onDevLog: (callback: (entry: {
-      source: 'cli' | 'conductor' | 'scheduler' | 'mcp' | 'system';
-      level: 'info' | 'warn' | 'error' | 'debug' | 'success';
-      message: string;
-      details?: string;
+    onTerminalLine: (callback: (line: {
+      id: string;
+      timestamp: Date;
+      sessionId: string;
+      type: 'spawn' | 'stdin' | 'stdout' | 'stderr' | 'exit' | 'system';
+      content: string;
+      tool?: string;
+      pid?: number;
+      exitCode?: number;
     }) => void): (() => void) => {
-      const handler = (_event: IpcRendererEvent, entry: {
-        source: 'cli' | 'conductor' | 'scheduler' | 'mcp' | 'system';
-        level: 'info' | 'warn' | 'error' | 'debug' | 'success';
-        message: string;
-        details?: string;
-      }) => callback(entry);
-      ipcRenderer.on('dev-log', handler);
+      const handler = (_event: IpcRendererEvent, line: {
+        id: string;
+        timestamp: Date;
+        sessionId: string;
+        type: 'spawn' | 'stdin' | 'stdout' | 'stderr' | 'exit' | 'system';
+        content: string;
+        tool?: string;
+        pid?: number;
+        exitCode?: number;
+      }) => callback(line);
+      ipcRenderer.on('terminal-line', handler);
       return () => {
-        ipcRenderer.removeListener('dev-log', handler);
+        ipcRenderer.removeListener('terminal-line', handler);
       };
     },
 
     /**
-     * Listen for CLI process lifecycle events.
-     * Tracks when CLI processes start and end.
+     * Listen for agent session lifecycle events.
+     * Tracks when agent processes start and end.
      */
-    onCliProcess: (callback: (event: {
+    onAgentSession: (callback: (event: {
       action: 'start' | 'end';
-      id: string;
-      command: string;
-      pid?: number;
-      success?: boolean;
+      session: {
+        id: string;
+        tool: string;
+        command: string;
+        args: string[];
+        pid?: number;
+        startedAt: Date;
+        endedAt?: Date;
+        status: 'running' | 'done' | 'failed';
+      };
     }) => void): (() => void) => {
       const handler = (_event: IpcRendererEvent, event: {
         action: 'start' | 'end';
-        id: string;
-        command: string;
-        pid?: number;
-        success?: boolean;
+        session: {
+          id: string;
+          tool: string;
+          command: string;
+          args: string[];
+          pid?: number;
+          startedAt: Date;
+          endedAt?: Date;
+          status: 'running' | 'done' | 'failed';
+        };
       }) => callback(event);
-      ipcRenderer.on('cli-process', handler);
+      ipcRenderer.on('agent-session', handler);
       return () => {
-        ipcRenderer.removeListener('cli-process', handler);
+        ipcRenderer.removeListener('agent-session', handler);
       };
     },
 
     /**
-     * Enable or disable dev console logging.
+     * Enable or disable backend terminal streaming.
      */
     setEnabled: (enabled: boolean): Promise<void> => {
       return ipcRenderer.invoke('dev-console:set-enabled', enabled);
     },
 
     /**
-     * Check if dev console is enabled.
+     * Check if backend terminal is enabled.
      */
     isEnabled: (): Promise<boolean> => {
       return ipcRenderer.invoke('dev-console:is-enabled');

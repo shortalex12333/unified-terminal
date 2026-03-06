@@ -848,12 +848,12 @@ app.whenReady().then(() => {
   }
   console.log('[App] Preview Manager initialized');
 
-  // Initialize Developer Console (Creator View for backend visibility)
+  // Initialize Backend Terminal (Creator View for backend visibility)
   if (mainWindow) {
     devLog.setMainWindow(mainWindow);
-    devLog.system('info', 'Developer Console initialized');
+    devLog.system('Backend Terminal initialized');
   }
-  console.log('[App] Developer Console initialized');
+  console.log('[App] Backend Terminal initialized');
 
   // Initialize auto-updater (Gate 12) -- skip in test mode
   if (!isTestMode) {

@@ -19,7 +19,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { getStateManager, StateManager } from './state-manager';
 import { conductorEvents } from './events';
-import { devLog } from './dev-logger';
+import { devLog, backendTerminal } from './dev-logger';
 
 // ============================================================================
 // TYPES
@@ -616,16 +616,23 @@ export class Conductor extends EventEmitter {
         stdio: ['pipe', 'pipe', 'pipe'],
       });
 
-      devLog.conductor('debug', `Spawned Codex for classification`, `Args: ${args.join(' ')}`);
+      const sessionId = `conductor-${Date.now()}`;
+      backendTerminal.agentSpawn(sessionId, 'codex', 'codex', args, proc.pid);
 
       let output = '';
       let responseText = '';
 
+      // Stream the prompt being sent to Codex
+      backendTerminal.stdin(sessionId, prompt);
       proc.stdin?.write(prompt);
       proc.stdin?.end();
 
       proc.stdout?.on('data', (data: Buffer) => {
-        output += data.toString();
+        const chunk = data.toString();
+        output += chunk;
+
+        // Stream raw output to backend terminal
+        backendTerminal.stdout(sessionId, chunk);
 
         // Parse JSON lines to extract response
         const lines = output.split('\n');
@@ -650,19 +657,22 @@ export class Conductor extends EventEmitter {
 
       proc.stderr?.on('data', (data: Buffer) => {
         const text = data.toString();
+        backendTerminal.stderr(sessionId, text);
         if (!text.includes('Reading prompt from stdin')) {
           console.error('[Conductor] classify stderr:', text);
         }
       });
 
       proc.on('close', (code: number | null) => {
+        backendTerminal.agentExit(sessionId, code ?? -1);
+
         if (code === 0 && responseText) {
           const plan = parseExecutionPlan(responseText);
           if (plan) {
             this.emit('classification-complete', plan);
             conductorEvents.classifyComplete(`plan_${Date.now()}`, plan.plan.length);
             conductorEvents.planReady(`plan_${Date.now()}`, `${plan.complexity} task with ${plan.plan.length} steps`);
-            devLog.conductor('success', `Plan created: ${plan.complexity} task`, `${plan.plan.length} steps, route: ${plan.route}`);
+            backendTerminal.system(`[CONDUCTOR] Plan created: ${plan.complexity} task with ${plan.plan.length} steps`);
             resolve(plan);
           } else {
             // Fallback: create a simple web route
@@ -679,14 +689,14 @@ export class Conductor extends EventEmitter {
               }],
               estimated_minutes: 1,
             };
-            devLog.conductor('warn', `Could not parse plan, using fallback`, responseText.substring(0, 200));
+            backendTerminal.system(`[CONDUCTOR] Could not parse plan, using fallback`);
             resolve(fallbackPlan);
           }
         } else {
           const error = new Error(`Classification failed (code: ${code})`);
           this.emit('error', error);
           conductorEvents.error(error.message);
-          devLog.conductor('error', `Classification failed`, `Exit code: ${code}`);
+          backendTerminal.system(`[CONDUCTOR] Classification failed (exit code: ${code})`);
           reject(error);
         }
       });

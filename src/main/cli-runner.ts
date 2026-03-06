@@ -23,7 +23,7 @@ import { spawn, ChildProcess, SpawnOptions as NodeSpawnOptions } from 'child_pro
 import * as path from 'path';
 import * as os from 'os';
 import * as fs from 'fs';
-import { devLog } from './dev-logger';
+import { devLog, backendTerminal } from './dev-logger';
 
 // tree-kill for killing process trees
 // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -320,16 +320,15 @@ export class CLIRunner extends EventEmitter {
 
     console.log(`[CLIRunner] Spawning process ${processId}: ${info.command}`);
 
-    // Log to Developer Console
-    devLog.cli('info', `Spawning: ${tool} ${args.join(' ')}`, `PID: pending, CWD: ${cwd}`);
-    devLog.cliProcess({ action: 'start', id: processId, command: info.command });
-
     try {
       // Spawn the process
       const childProcess = spawn(tool, args, spawnOpts);
 
       // Store process info
       info.pid = childProcess.pid;
+
+      // Stream to backend terminal (shows actual CLI launch)
+      backendTerminal.agentSpawn(processId, tool, tool, args, childProcess.pid);
 
       const processEntry = {
         info,
@@ -619,12 +618,12 @@ export class CLIRunner extends EventEmitter {
       timestamp: new Date(),
     };
 
-    // Log to Developer Console (truncate long outputs)
-    const truncated = data.length > 200 ? data.substring(0, 200) + '...' : data;
-    devLog.cli(
-      stream === 'stderr' ? 'warn' : 'debug',
-      `[${processId.substring(0, 8)}] ${truncated.trim()}`
-    );
+    // Stream raw output to backend terminal
+    if (stream === 'stdout') {
+      backendTerminal.stdout(processId, data);
+    } else {
+      backendTerminal.stderr(processId, data);
+    }
 
     this.emit('output', output);
   }
@@ -666,14 +665,8 @@ export class CLIRunner extends EventEmitter {
 
     console.log(`[CLIRunner] Process ${processId} exited with code ${code}, signal ${signal}`);
 
-    // Log to Developer Console
-    const success = code === 0;
-    devLog.cli(
-      success ? 'success' : 'error',
-      `Process ${processId.substring(0, 8)} ${success ? 'completed' : 'failed'}`,
-      `Exit code: ${code}, Signal: ${signal || 'none'}`
-    );
-    devLog.cliProcess({ action: 'end', id: processId, command: info.command, success });
+    // Stream exit to backend terminal
+    backendTerminal.agentExit(processId, code ?? -1, signal || undefined);
   }
 
   /**

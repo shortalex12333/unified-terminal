@@ -1,112 +1,109 @@
 /**
- * Developer Console - Split-screen view for creator to see backend processes
+ * Backend Terminal - Shows raw CLI/agent activity for the creator
  *
- * Shows:
- * - CLI process output (Codex, Claude Code, etc.)
- * - Conductor decisions and DAG creation
- * - Step scheduler events
- * - MCP connection status
+ * Displays:
+ * - Agent spawns (Codex, Claude Code, etc.)
+ * - Prompts being sent to agents (stdin)
+ * - Agent output (stdout/stderr)
+ * - Process exits and status
  *
- * This is for development/staging ONLY - users don't see this.
+ * This is terminal-style output - the actual CLI experience,
+ * not formatted developer logs. Cmd+Shift+D to toggle.
  */
 
 import React, { useState, useEffect, useRef } from 'react';
 
-interface LogEntry {
+interface TerminalLine {
   id: string;
   timestamp: Date;
-  source: 'cli' | 'conductor' | 'scheduler' | 'mcp' | 'system';
-  level: 'info' | 'warn' | 'error' | 'debug' | 'success';
-  message: string;
-  details?: string;
-}
-
-interface CLIProcess {
-  id: string;
-  command: string;
-  startedAt: Date;
-  status: 'running' | 'done' | 'failed';
+  sessionId: string;
+  type: 'spawn' | 'stdin' | 'stdout' | 'stderr' | 'exit' | 'system';
+  content: string;
+  tool?: string;
   pid?: number;
+  exitCode?: number;
 }
 
-const SOURCE_COLORS: Record<string, string> = {
-  cli: '#10b981',      // green
-  conductor: '#8b5cf6', // purple
-  scheduler: '#3b82f6', // blue
-  mcp: '#f59e0b',       // amber
-  system: '#6b7280',    // gray
+interface AgentSession {
+  id: string;
+  tool: string;
+  command: string;
+  args: string[];
+  pid?: number;
+  startedAt: Date;
+  endedAt?: Date;
+  status: 'running' | 'done' | 'failed';
+}
+
+const TYPE_COLORS: Record<string, string> = {
+  spawn: '#22c55e',   // green - command launch
+  stdin: '#a855f7',   // purple - prompt/input sent
+  stdout: '#e5e7eb',  // light gray - normal output
+  stderr: '#f59e0b',  // amber - warnings/errors
+  exit: '#6b7280',    // gray - process exit
+  system: '#3b82f6',  // blue - orchestration events
 };
 
-const LEVEL_COLORS: Record<string, string> = {
-  info: '#e5e7eb',
-  warn: '#fbbf24',
-  error: '#ef4444',
-  debug: '#9ca3af',
-  success: '#10b981',
+const TOOL_COLORS: Record<string, string> = {
+  codex: '#10b981',
+  claude: '#8b5cf6',
+  gsd: '#3b82f6',
+  npm: '#ef4444',
+  git: '#f97316',
 };
 
 export function DeveloperConsole(): React.ReactElement {
-  const [logs, setLogs] = useState<LogEntry[]>([]);
-  const [processes, setProcesses] = useState<CLIProcess[]>([]);
-  const [filter, setFilter] = useState<string>('all');
+  const [lines, setLines] = useState<TerminalLine[]>([]);
+  const [sessions, setSessions] = useState<AgentSession[]>([]);
   const [autoScroll, setAutoScroll] = useState(true);
   const [isMinimized, setIsMinimized] = useState(false);
-  const logContainerRef = useRef<HTMLDivElement>(null);
+  const [filter, setFilter] = useState<string>('all');
+  const terminalRef = useRef<HTMLDivElement>(null);
 
-  // Subscribe to backend events
+  // Subscribe to backend terminal events
   useEffect(() => {
     const api = (window as any).electronAPI;
-    if (!api?.devConsole) return;
+    if (!api?.backendTerminal) return;
 
-    // Dev log entries (CLI output, conductor, scheduler, etc.)
-    const unsubLog = api.devConsole.onDevLog?.((data: any) => {
-      const entry: LogEntry = {
-        id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        timestamp: new Date(),
-        source: data.source || 'system',
-        level: data.level || 'info',
-        message: data.message,
-        details: data.details,
-      };
-      setLogs(prev => [...prev.slice(-500), entry]); // Keep last 500 entries
+    // Terminal lines (raw CLI content)
+    const unsubLine = api.backendTerminal.onTerminalLine?.((line: TerminalLine) => {
+      setLines(prev => [...prev.slice(-1000), line]); // Keep last 1000 lines
     });
 
-    // CLI process lifecycle tracking
-    const unsubProcess = api.devConsole.onCliProcess?.((data: any) => {
-      if (data.action === 'start') {
-        setProcesses(prev => [...prev, {
-          id: data.id,
-          command: data.command,
-          startedAt: new Date(),
-          status: 'running',
-          pid: data.pid,
-        }]);
-      } else if (data.action === 'end') {
-        setProcesses(prev => prev.map(p =>
-          p.id === data.id ? { ...p, status: data.success ? 'done' : 'failed' } : p
+    // Agent session lifecycle
+    const unsubSession = api.backendTerminal.onAgentSession?.((event: {
+      action: 'start' | 'end';
+      session: AgentSession;
+    }) => {
+      if (event.action === 'start') {
+        setSessions(prev => [...prev, event.session]);
+      } else {
+        setSessions(prev => prev.map(s =>
+          s.id === event.session.id ? event.session : s
         ));
       }
     });
 
     return () => {
-      unsubLog?.();
-      unsubProcess?.();
+      unsubLine?.();
+      unsubSession?.();
     };
   }, []);
 
   // Auto-scroll to bottom
   useEffect(() => {
-    if (autoScroll && logContainerRef.current) {
-      logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight;
+    if (autoScroll && terminalRef.current) {
+      terminalRef.current.scrollTop = terminalRef.current.scrollHeight;
     }
-  }, [logs, autoScroll]);
+  }, [lines, autoScroll]);
 
-  const filteredLogs = filter === 'all'
-    ? logs
-    : logs.filter(l => l.source === filter);
+  const filteredLines = filter === 'all'
+    ? lines
+    : lines.filter(l => l.type === filter || (filter === 'output' && (l.type === 'stdout' || l.type === 'stderr')));
 
   const formatTime = (date: Date) => {
-    return date.toLocaleTimeString('en-US', {
+    const d = new Date(date);
+    return d.toLocaleTimeString('en-US', {
       hour12: false,
       hour: '2-digit',
       minute: '2-digit',
@@ -114,7 +111,9 @@ export function DeveloperConsole(): React.ReactElement {
     });
   };
 
-  const clearLogs = () => setLogs([]);
+  const clearTerminal = () => setLines([]);
+
+  const runningCount = sessions.filter(s => s.status === 'running').length;
 
   if (isMinimized) {
     return (
@@ -124,18 +123,18 @@ export function DeveloperConsole(): React.ReactElement {
           position: 'fixed',
           bottom: 10,
           right: 10,
-          background: '#1f2937',
-          border: '1px solid #374151',
+          background: '#0d1117',
+          border: '1px solid #30363d',
           borderRadius: 8,
           padding: '8px 16px',
           cursor: 'pointer',
-          color: '#9ca3af',
+          color: '#8b949e',
           fontSize: 12,
-          fontFamily: 'monospace',
+          fontFamily: 'ui-monospace, SFMono-Regular, SF Mono, Menlo, monospace',
           zIndex: 9999,
         }}
       >
-        🔧 Dev Console ({logs.length} logs)
+        Terminal ({runningCount} running)
       </div>
     );
   }
@@ -145,36 +144,44 @@ export function DeveloperConsole(): React.ReactElement {
       display: 'flex',
       flexDirection: 'column',
       height: '100%',
-      background: '#111827',
-      borderLeft: '1px solid #374151',
-      fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
-      fontSize: 12,
-      color: '#e5e7eb',
+      background: '#0d1117',
+      borderLeft: '1px solid #30363d',
+      fontFamily: 'ui-monospace, SFMono-Regular, SF Mono, Menlo, monospace',
+      fontSize: 13,
+      color: '#c9d1d9',
     }}>
       {/* Header */}
       <div style={{
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
-        padding: '8px 12px',
-        borderBottom: '1px solid #374151',
-        background: '#1f2937',
+        padding: '10px 12px',
+        borderBottom: '1px solid #30363d',
+        background: '#161b22',
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontWeight: 600 }}>🔧 Developer Console</span>
-          <span style={{ color: '#6b7280', fontSize: 11 }}>
-            (Creator View - Users don't see this)
-          </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span style={{ fontWeight: 600, color: '#58a6ff' }}>Backend Terminal</span>
+          {runningCount > 0 && (
+            <span style={{
+              background: '#238636',
+              color: '#fff',
+              padding: '2px 8px',
+              borderRadius: 10,
+              fontSize: 11,
+            }}>
+              {runningCount} agent{runningCount !== 1 ? 's' : ''} running
+            </span>
+          )}
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <button
-            onClick={clearLogs}
+            onClick={clearTerminal}
             style={{
-              background: '#374151',
-              border: 'none',
-              borderRadius: 4,
-              padding: '4px 8px',
-              color: '#9ca3af',
+              background: '#21262d',
+              border: '1px solid #30363d',
+              borderRadius: 6,
+              padding: '4px 10px',
+              color: '#8b949e',
               cursor: 'pointer',
               fontSize: 11,
             }}
@@ -184,49 +191,55 @@ export function DeveloperConsole(): React.ReactElement {
           <button
             onClick={() => setIsMinimized(true)}
             style={{
-              background: '#374151',
-              border: 'none',
-              borderRadius: 4,
-              padding: '4px 8px',
-              color: '#9ca3af',
+              background: '#21262d',
+              border: '1px solid #30363d',
+              borderRadius: 6,
+              padding: '4px 10px',
+              color: '#8b949e',
               cursor: 'pointer',
               fontSize: 11,
             }}
           >
-            Minimize
+            _
           </button>
         </div>
       </div>
 
-      {/* Process Status Bar */}
-      {processes.filter(p => p.status === 'running').length > 0 && (
+      {/* Running Agents Bar */}
+      {runningCount > 0 && (
         <div style={{
           display: 'flex',
           gap: 8,
-          padding: '6px 12px',
-          background: '#1e3a5f',
-          borderBottom: '1px solid #374151',
+          padding: '8px 12px',
+          background: '#161b22',
+          borderBottom: '1px solid #30363d',
           flexWrap: 'wrap',
         }}>
-          {processes.filter(p => p.status === 'running').map(proc => (
-            <div key={proc.id} style={{
+          {sessions.filter(s => s.status === 'running').map(session => (
+            <div key={session.id} style={{
               display: 'flex',
               alignItems: 'center',
               gap: 6,
-              background: '#1f2937',
-              padding: '4px 8px',
-              borderRadius: 4,
-              fontSize: 11,
+              background: '#21262d',
+              padding: '4px 10px',
+              borderRadius: 6,
+              fontSize: 12,
             }}>
               <span style={{
                 width: 8,
                 height: 8,
                 borderRadius: '50%',
-                background: '#10b981',
+                background: TOOL_COLORS[session.tool] || '#22c55e',
                 animation: 'pulse 1.5s infinite',
               }} />
-              <span style={{ color: '#10b981' }}>{proc.command}</span>
-              {proc.pid && <span style={{ color: '#6b7280' }}>PID:{proc.pid}</span>}
+              <span style={{ color: TOOL_COLORS[session.tool] || '#c9d1d9', fontWeight: 500 }}>
+                {session.tool}
+              </span>
+              {session.pid && (
+                <span style={{ color: '#6e7681', fontSize: 11 }}>
+                  PID:{session.pid}
+                </span>
+              )}
             </div>
           ))}
         </div>
@@ -235,120 +248,134 @@ export function DeveloperConsole(): React.ReactElement {
       {/* Filter Bar */}
       <div style={{
         display: 'flex',
-        gap: 4,
-        padding: '6px 12px',
-        borderBottom: '1px solid #374151',
-        background: '#1f2937',
+        gap: 6,
+        padding: '8px 12px',
+        borderBottom: '1px solid #30363d',
+        background: '#161b22',
       }}>
-        {['all', 'cli', 'conductor', 'scheduler', 'mcp', 'system'].map(f => (
+        {['all', 'spawn', 'stdin', 'output', 'system'].map(f => (
           <button
             key={f}
             onClick={() => setFilter(f)}
             style={{
-              background: filter === f ? '#374151' : 'transparent',
-              border: 'none',
-              borderRadius: 4,
-              padding: '4px 8px',
-              color: filter === f ? '#fff' : '#9ca3af',
+              background: filter === f ? '#388bfd' : '#21262d',
+              border: '1px solid ' + (filter === f ? '#388bfd' : '#30363d'),
+              borderRadius: 6,
+              padding: '4px 10px',
+              color: filter === f ? '#fff' : '#8b949e',
               cursor: 'pointer',
               fontSize: 11,
               textTransform: 'capitalize',
             }}
           >
-            {f === 'all' ? 'All' : f}
-            {f !== 'all' && (
-              <span style={{
-                display: 'inline-block',
-                width: 8,
-                height: 8,
-                borderRadius: '50%',
-                background: SOURCE_COLORS[f],
-                marginLeft: 4,
-              }} />
-            )}
+            {f === 'output' ? 'stdout/err' : f}
           </button>
         ))}
         <div style={{ flex: 1 }} />
-        <label style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#6b7280', fontSize: 11 }}>
+        <label style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          color: '#6e7681',
+          fontSize: 11,
+          cursor: 'pointer',
+        }}>
           <input
             type="checkbox"
             checked={autoScroll}
             onChange={e => setAutoScroll(e.target.checked)}
+            style={{ accentColor: '#388bfd' }}
           />
           Auto-scroll
         </label>
       </div>
 
-      {/* Log Output */}
+      {/* Terminal Output */}
       <div
-        ref={logContainerRef}
+        ref={terminalRef}
         style={{
           flex: 1,
           overflow: 'auto',
           padding: '8px 0',
         }}
       >
-        {filteredLogs.length === 0 ? (
-          <div style={{ padding: 20, textAlign: 'center', color: '#6b7280' }}>
-            Waiting for backend events...
-            <br />
-            <span style={{ fontSize: 11 }}>
-              CLI processes, conductor decisions, and scheduler events will appear here.
-            </span>
+        {filteredLines.length === 0 ? (
+          <div style={{
+            padding: 24,
+            textAlign: 'center',
+            color: '#6e7681',
+          }}>
+            <div style={{ fontSize: 14, marginBottom: 8 }}>Waiting for agent activity...</div>
+            <div style={{ fontSize: 12 }}>
+              CLI processes, prompts, and outputs will appear here.
+            </div>
           </div>
         ) : (
-          filteredLogs.map(entry => (
+          filteredLines.map(line => (
             <div
-              key={entry.id}
+              key={line.id}
               style={{
                 display: 'flex',
                 padding: '2px 12px',
-                borderLeft: `3px solid ${SOURCE_COLORS[entry.source]}`,
-                background: entry.level === 'error' ? 'rgba(239, 68, 68, 0.1)' : 'transparent',
+                borderLeft: `3px solid ${TYPE_COLORS[line.type]}`,
+                background: line.type === 'stderr' ? 'rgba(245, 158, 11, 0.1)' :
+                           line.type === 'stdin' ? 'rgba(168, 85, 247, 0.05)' :
+                           line.type === 'spawn' ? 'rgba(34, 197, 94, 0.05)' :
+                           'transparent',
+                fontFamily: 'inherit',
+                whiteSpace: 'pre-wrap',
+                wordBreak: 'break-word',
               }}
             >
-              <span style={{ color: '#6b7280', minWidth: 70 }}>
-                {formatTime(entry.timestamp)}
-              </span>
               <span style={{
-                color: SOURCE_COLORS[entry.source],
-                minWidth: 80,
-                textTransform: 'uppercase',
-                fontSize: 10,
-                fontWeight: 600,
+                color: '#6e7681',
+                minWidth: 70,
+                fontSize: 11,
+                userSelect: 'none',
               }}>
-                [{entry.source}]
+                {formatTime(line.timestamp)}
               </span>
-              <span style={{ color: LEVEL_COLORS[entry.level], flex: 1 }}>
-                {entry.message}
+              {line.tool && (
+                <span style={{
+                  color: TOOL_COLORS[line.tool] || '#6e7681',
+                  minWidth: 60,
+                  fontSize: 11,
+                  fontWeight: 500,
+                }}>
+                  [{line.tool}]
+                </span>
+              )}
+              <span style={{
+                color: TYPE_COLORS[line.type],
+                flex: 1,
+                lineHeight: 1.5,
+              }}>
+                {line.type === 'stdin' && <span style={{ color: '#a855f7', marginRight: 8 }}>{'>'}</span>}
+                {line.content}
               </span>
             </div>
           ))
         )}
       </div>
 
-      {/* Footer Stats */}
+      {/* Footer */}
       <div style={{
         display: 'flex',
         justifyContent: 'space-between',
-        padding: '6px 12px',
-        borderTop: '1px solid #374151',
-        background: '#1f2937',
+        padding: '8px 12px',
+        borderTop: '1px solid #30363d',
+        background: '#161b22',
         fontSize: 11,
-        color: '#6b7280',
+        color: '#6e7681',
       }}>
-        <span>{filteredLogs.length} log entries</span>
-        <span>
-          Processes: {processes.filter(p => p.status === 'running').length} running,{' '}
-          {processes.filter(p => p.status === 'done').length} done,{' '}
-          {processes.filter(p => p.status === 'failed').length} failed
-        </span>
+        <span>{filteredLines.length} lines</span>
+        <span>Cmd+Shift+D to toggle</span>
       </div>
 
       <style>{`
         @keyframes pulse {
           0%, 100% { opacity: 1; }
-          50% { opacity: 0.5; }
+          50% { opacity: 0.4; }
         }
       `}</style>
     </div>
