@@ -2205,4 +2205,61 @@ contextBridge.exposeInMainWorld('electronAPI', {
       };
     },
   },
+
+  // ============================================================================
+  // PROJECT METHODS (Progress Monitor)
+  // ============================================================================
+
+  /**
+   * Project API for progress monitor architecture.
+   * Handles project lifecycle: start → progress updates → completion.
+   */
+  project: {
+    // Subscribe to IPC channels
+    onUpdate: (callback: (data: { type: string; message: string }) => void) => {
+      const subscription = (_event: unknown, data: { type: string; message: string }) => callback(data);
+      ipcRenderer.on('project:update', subscription);
+      return () => ipcRenderer.removeListener('project:update', subscription);
+    },
+
+    onProgress: (callback: (data: { phases: Array<{ name: string; status: 'done' | 'active' | 'pending' }> }) => void) => {
+      const subscription = (_event: unknown, data: unknown) => callback(data as { phases: Array<{ name: string; status: 'done' | 'active' | 'pending' }> });
+      ipcRenderer.on('project:progress', subscription);
+      return () => ipcRenderer.removeListener('project:progress', subscription);
+    },
+
+    onFile: (callback: (data: { name: string; path: string; canPreview: boolean; canOpen: boolean }) => void) => {
+      const subscription = (_event: unknown, data: unknown) => callback(data as { name: string; path: string; canPreview: boolean; canOpen: boolean });
+      ipcRenderer.on('project:file', subscription);
+      return () => ipcRenderer.removeListener('project:file', subscription);
+    },
+
+    onAction: (callback: (data: { type: 'mcp' | 'circuit'; title: string; message: string; actions: Array<{ label: string; action: string }> }) => void) => {
+      const subscription = (_event: unknown, data: unknown) => callback(data as { type: 'mcp' | 'circuit'; title: string; message: string; actions: Array<{ label: string; action: string }> });
+      ipcRenderer.on('project:action', subscription);
+      return () => ipcRenderer.removeListener('project:action', subscription);
+    },
+
+    onComplete: (callback: (data: { humanFolder: string; deployedUrl?: string; summary: { pages: number; components: number } }) => void) => {
+      const subscription = (_event: unknown, data: unknown) => callback(data as { humanFolder: string; deployedUrl?: string; summary: { pages: number; components: number } });
+      ipcRenderer.on('project:complete', subscription);
+      return () => ipcRenderer.removeListener('project:complete', subscription);
+    },
+
+    // Actions
+    start: (prompt: string): Promise<{ projectId: string; projectName: string }> =>
+      ipcRenderer.invoke('project:start', prompt),
+
+    respondToAction: (action: string): Promise<void> =>
+      ipcRenderer.invoke('project:respond-action', action),
+
+    openFolder: (path: string): Promise<void> =>
+      ipcRenderer.invoke('project:open-folder', path),
+
+    openFile: (path: string): Promise<void> =>
+      ipcRenderer.invoke('project:open-file', path),
+
+    openUrl: (url: string): Promise<void> =>
+      ipcRenderer.invoke('project:open-url', url),
+  },
 });
