@@ -9,10 +9,61 @@
  */
 
 import { EventEmitter } from 'events';
+import * as fs from 'fs';
+import * as path from 'path';
+import { KENOKI_HIDDEN } from './project-scaffold';
 
 // Re-export StatusEvent type for convenience
 export type { StatusEvent } from '../status-agent/types';
 import type { StatusEvent, EventSource } from '../status-agent/types';
+
+// =============================================================================
+// PROJECT TRACKING
+// =============================================================================
+
+/**
+ * Current project ID for status file writing.
+ * Set by file-bridge when a project starts.
+ */
+let currentProjectId: string | null = null;
+
+/**
+ * Set the current project ID for status file writing.
+ */
+export function setCurrentProject(projectId: string | null): void {
+  currentProjectId = projectId;
+}
+
+/**
+ * Write status update to agent status file.
+ * Merges with existing status if file exists.
+ */
+function writeStatusFile(sessionId: string, status: Record<string, unknown>): void {
+  if (!currentProjectId) return;
+
+  const statusDir = path.join(KENOKI_HIDDEN, currentProjectId, 'status');
+  const statusFile = path.join(statusDir, `agent_${sessionId}.json`);
+
+  try {
+    // Ensure directory exists
+    fs.mkdirSync(statusDir, { recursive: true });
+
+    // Merge with existing status if it exists
+    let existing: Record<string, unknown> = {};
+    if (fs.existsSync(statusFile)) {
+      try {
+        existing = JSON.parse(fs.readFileSync(statusFile, 'utf8'));
+      } catch {
+        // Ignore parse errors, start fresh
+      }
+    }
+
+    const merged = { ...existing, ...status, updated_at: new Date().toISOString() };
+    fs.writeFileSync(statusFile, JSON.stringify(merged, null, 2));
+  } catch (err) {
+    console.error('[events] Failed to write status file:', err);
+  }
+}
 
 // =============================================================================
 // EVENT BUS SINGLETON
@@ -170,62 +221,137 @@ export const conductorEvents = {
 
 export const schedulerEvents = {
   /** Emitted when plan execution starts */
-  planStart: (planId: string, stepCount: number) =>
-    emitEvent('scheduler', 'plan-start', { planId, stepCount }),
+  planStart: (planId: string, stepCount: number) => {
+    emitEvent('scheduler', 'plan-start', { planId, stepCount });
+    writeStatusFile(planId, {
+      status: 'GREEN',
+      phase: 'planning',
+      total_steps: stepCount,
+    });
+  },
 
   /** Emitted when a step begins */
-  stepStart: (stepId: number, action: string, detail: string) =>
-    emitEvent('scheduler', 'step-start', { stepId, action, detail }),
+  stepStart: (stepId: number, action: string, detail: string) => {
+    emitEvent('scheduler', 'step-start', { stepId, action, detail });
+    writeStatusFile(String(stepId), {
+      status: 'GREEN',
+      current_task: action,
+      detail,
+    });
+  },
 
   /** Emitted during step progress */
-  stepProgress: (stepId: number, progress: number, activity: string) =>
-    emitEvent('scheduler', 'step-progress', { stepId, progress, activity }),
+  stepProgress: (stepId: number, progress: number, activity: string) => {
+    emitEvent('scheduler', 'step-progress', { stepId, progress, activity });
+    // Status changes to AMBER when progress > 70%
+    const status = progress > 70 ? 'AMBER' : 'GREEN';
+    writeStatusFile(String(stepId), {
+      status,
+      progress,
+      current_task: activity,
+    });
+  },
 
   /** Emitted when a step completes successfully */
-  stepDone: (stepId: number, action: string) =>
-    emitEvent('scheduler', 'step-done', { stepId, action }),
+  stepDone: (stepId: number, action: string) => {
+    emitEvent('scheduler', 'step-done', { stepId, action });
+    writeStatusFile(String(stepId), {
+      status: 'RED', // RED = done (traffic light metaphor)
+      current_task: `Completed: ${action}`,
+    });
+  },
 
   /** Emitted when a step fails */
-  stepFailed: (stepId: number, action: string, error: string, retryCount: number) =>
-    emitEvent('scheduler', 'step-failed', { stepId, action, error, retryCount }),
+  stepFailed: (stepId: number, action: string, error: string, retryCount: number) => {
+    emitEvent('scheduler', 'step-failed', { stepId, action, error, retryCount });
+    writeStatusFile(String(stepId), {
+      status: 'ERROR',
+      current_task: action,
+      error,
+      retryCount,
+    });
+  },
 
   /** Emitted when a step is skipped */
-  stepSkipped: (stepId: number, reason: string) =>
-    emitEvent('scheduler', 'step-skipped', { stepId, reason }),
+  stepSkipped: (stepId: number, reason: string) => {
+    emitEvent('scheduler', 'step-skipped', { stepId, reason });
+    writeStatusFile(String(stepId), {
+      status: 'SKIPPED',
+      reason,
+    });
+  },
 
   /** Emitted when circuit breaker triggers (needs user decision) */
-  needsUser: (stepId: number, options: string[]) =>
-    emitEvent('scheduler', 'needs-user', { stepId, options }),
+  needsUser: (stepId: number, options: string[]) => {
+    emitEvent('scheduler', 'needs-user', { stepId, options });
+    writeStatusFile(String(stepId), {
+      status: 'WAITING_USER',
+      options,
+    });
+  },
 
   /** Emitted when plan completes */
-  planComplete: (planId: string, success: boolean, summary: { done: number; failed: number; skipped: number }) =>
-    emitEvent('scheduler', 'plan-complete', { planId, success, ...summary }),
+  planComplete: (planId: string, success: boolean, summary: { done: number; failed: number; skipped: number }) => {
+    emitEvent('scheduler', 'plan-complete', { planId, success, ...summary });
+    writeStatusFile(planId, {
+      status: success ? 'COMPLETE' : 'FAILED',
+      done: summary.done,
+      failed: summary.failed,
+      skipped: summary.skipped,
+    });
+  },
 };
 
 export const workerEvents = {
   /** Emitted when CLI process spawns */
-  spawn: (stepId: string, action: string, projectDir: string) =>
-    emitEvent('worker', 'spawn', { stepId, action, projectDir }),
+  spawn: (stepId: string, action: string, projectDir: string) => {
+    emitEvent('worker', 'spawn', { stepId, action, projectDir });
+    writeStatusFile(stepId, {
+      status: 'SPAWNED',
+      action,
+      project_dir: projectDir,
+    });
+  },
 
   /** Emitted when a file is created */
-  fileCreated: (path: string) =>
-    emitEvent('worker', 'file-created', { path }),
+  fileCreated: (path: string) => {
+    emitEvent('worker', 'file-created', { path });
+    // File tracking can be handled by file-bridge chokidar watcher
+  },
 
   /** Emitted when a file is modified */
-  fileModified: (path: string) =>
-    emitEvent('worker', 'file-modified', { path }),
+  fileModified: (path: string) => {
+    emitEvent('worker', 'file-modified', { path });
+    // File tracking can be handled by file-bridge chokidar watcher
+  },
 
   /** Emitted when CLI process completes */
-  complete: (stepId: string, success: boolean, filesCreated: number, filesModified: number) =>
-    emitEvent('worker', 'complete', { stepId, success, filesCreated, filesModified }),
+  complete: (stepId: string, success: boolean, filesCreated: number, filesModified: number) => {
+    emitEvent('worker', 'complete', { stepId, success, filesCreated, filesModified });
+    writeStatusFile(stepId, {
+      status: success ? 'COMPLETE' : 'FAILED',
+      files_created: filesCreated,
+      files_modified: filesModified,
+    });
+  },
 
   /** Emitted on CLI execution error */
-  error: (stepId: string, error: string) =>
-    emitEvent('worker', 'error', { stepId, error }),
+  error: (stepId: string, error: string) => {
+    emitEvent('worker', 'error', { stepId, error });
+    writeStatusFile(stepId, {
+      status: 'ERROR',
+      error,
+    });
+  },
 
   /** Emitted when CLI process times out */
-  timeout: (stepId: string, timeoutMs: number) =>
-    emitEvent('worker', 'timeout', { stepId, timeoutMs }),
+  timeout: (stepId: string, timeoutMs: number) => {
+    emitEvent('worker', 'timeout', { stepId, timeoutMs });
+    writeStatusFile(stepId, {
+      status: 'TIMEOUT',
+      timeout_ms: timeoutMs,
+    });
+  },
 };
 
 export const bodyguardEvents = {
