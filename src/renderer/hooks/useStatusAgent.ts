@@ -7,62 +7,18 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 
-// =============================================================================
-// TYPE DEFINITIONS
-// =============================================================================
+// Import canonical types from status-agent (via types bridge)
+import type {
+  StatusState,
+  StatusLine,
+  StatusLineUpdate,
+  UserQuery,
+  QueryOption,
+  FuelState,
+} from '../types/status-agent.d';
 
-export type StatusState = 'pending' | 'active' | 'done' | 'error' | 'paused' | 'waiting_user';
-
-export interface StatusLine {
-  id: string;
-  text: string;
-  expandable: boolean;
-  expandedText: string | null;
-  state: StatusState;
-  stepId: number | null;
-  parentId: string | null;
-  progress: number | null;
-  icon: string;
-}
-
-export interface StatusLineUpdate {
-  id: string;
-  text?: string;
-  state?: StatusState;
-  progress?: number | null;
-  expandable?: boolean;
-  expandedText?: string | null;
-  icon?: string;
-}
-
-export interface QueryOption {
-  label: string;
-  value: string;
-  detail: string | null;
-  icon: string | null;
-}
-
-export interface UserQuery {
-  id: string;
-  source: string;
-  stepId: number | null;
-  agentHandle: string;
-  type: 'choice' | 'text' | 'confirm' | 'upload';
-  question: string;
-  options: QueryOption[];
-  placeholder: string | null;
-  defaultChoice: string | null;
-  timeout: number;
-  priority: 'normal' | 'blocking';
-}
-
-export interface FuelState {
-  percent: number;
-  label: string;
-  detail: string;
-  warning: boolean;
-  warningText: string | null;
-}
+// Re-export for consumers of this hook
+export type { StatusState, StatusLine, StatusLineUpdate, UserQuery, QueryOption, FuelState };
 
 // =============================================================================
 // RENDERER TREE NODE (adapted for React rendering)
@@ -103,6 +59,8 @@ export interface StatusAgentState {
   interruptFeedback: { text: string; detail: string } | null;
   /** Query countdown timer (seconds remaining) */
   queryTimer: number;
+  /** Elapsed time since build started (formatted string, e.g., "2m 15s") */
+  elapsed: string;
 }
 
 export interface StatusAgentActions {
@@ -192,6 +150,26 @@ function calculateOverallProgress(tree: RenderTreeNode[]): number {
   return Math.round(sum / tree.length);
 }
 
+/**
+ * Format elapsed time as human-readable string.
+ * E.g., "15s", "1m 30s", "2h 5m"
+ */
+function formatElapsedTime(startTime: number): string {
+  const elapsedMs = Date.now() - startTime;
+  const totalSeconds = Math.floor(elapsedMs / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  if (hours > 0) {
+    return `${hours}h ${minutes}m`;
+  } else if (minutes > 0) {
+    return `${minutes}m ${seconds}s`;
+  } else {
+    return `${seconds}s`;
+  }
+}
+
 // =============================================================================
 // MAIN HOOK
 // =============================================================================
@@ -221,6 +199,11 @@ export function useStatusAgent(): StatusAgentState & StatusAgentActions {
 
   // Timer ref for query countdown
   const queryTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Elapsed time tracking
+  const [elapsed, setElapsed] = useState('');
+  const buildStartTimeRef = useRef<number | null>(null);
+  const elapsedTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // ==========================================================================
   // IPC Event Subscriptions
@@ -344,12 +327,33 @@ export function useStatusAgent(): StatusAgentState & StatusAgentActions {
           linesMapRef.current = new Map();
           setTree([]);
           setOverallProgress(0);
+
+          // Start elapsed time tracking
+          buildStartTimeRef.current = Date.now();
+          setElapsed('0s');
+
+          // Clear any existing elapsed timer
+          if (elapsedTimerRef.current) {
+            clearInterval(elapsedTimerRef.current);
+          }
+
+          // Update elapsed time every second
+          elapsedTimerRef.current = setInterval(() => {
+            if (buildStartTimeRef.current) {
+              setElapsed(formatElapsedTime(buildStartTimeRef.current));
+            }
+          }, 1000);
         })
       );
 
       cleanups.push(
         api.onBuildComplete(() => {
           setBuildState('complete');
+          // Stop elapsed time tracking
+          if (elapsedTimerRef.current) {
+            clearInterval(elapsedTimerRef.current);
+            elapsedTimerRef.current = null;
+          }
         })
       );
 
@@ -395,6 +399,10 @@ export function useStatusAgent(): StatusAgentState & StatusAgentActions {
       if (queryTimerRef.current) {
         clearInterval(queryTimerRef.current);
         queryTimerRef.current = null;
+      }
+      if (elapsedTimerRef.current) {
+        clearInterval(elapsedTimerRef.current);
+        elapsedTimerRef.current = null;
       }
     };
   }, []);
@@ -447,6 +455,7 @@ export function useStatusAgent(): StatusAgentState & StatusAgentActions {
     overallProgress,
     interruptFeedback,
     queryTimer,
+    elapsed,
     sendQueryResponse,
     sendCorrection,
     sendStopStep,

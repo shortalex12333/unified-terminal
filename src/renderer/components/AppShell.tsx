@@ -345,6 +345,7 @@ export default function AppShell({ initialState = 'idle', children }: AppShellPr
     overallProgress,
     interruptFeedback,
     queryTimer,
+    elapsed,
     sendQueryResponse,
     sendCorrection,
     sendStopStep,
@@ -413,6 +414,7 @@ export default function AppShell({ initialState = 'idle', children }: AppShellPr
           <TopBarPill
             projectName={projectName || 'Building...'}
             progress={overallProgress}
+            elapsed={elapsed}
             onExpand={() => {
               expandTree();
             }}
