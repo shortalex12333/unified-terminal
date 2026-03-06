@@ -22,6 +22,7 @@ import {
   analyzeOutput,
   DEFAULT_MONKEY_CONFIG,
 } from './detector';
+import { getLedgerWriter, type LedgerWriter } from '../ledger';
 
 // =============================================================================
 // RE-EXPORTS
@@ -163,6 +164,7 @@ export class CuriousMonkeyObserver extends EventEmitter {
   private state: MonkeyState;
   private pollTimer: NodeJS.Timeout | null = null;
   private isRunning: boolean = false;
+  private ledgerWriter: LedgerWriter | null = null;
 
   // Paths derived from projectRoot
   private get kenokiDir(): string {
@@ -218,6 +220,9 @@ export class CuriousMonkeyObserver extends EventEmitter {
 
     // Ensure directories exist
     this.ensureDirectories();
+
+    // Initialize ledger writer for ONE-WAY communication to PA
+    this.ledgerWriter = getLedgerWriter(this.projectRoot);
 
     this.isRunning = true;
     this.state.startedAt = new Date();
@@ -365,27 +370,48 @@ export class CuriousMonkeyObserver extends EventEmitter {
   }
 
   /**
-   * Append detections to JSONL file (ONE-WAY write to PA).
-   * PA reads this file to decide on actions.
-   * Monkey never receives direct replies.
+   * Append detections to ledger (ONE-WAY write to PA).
+   * PA reads the ledger to decide on actions.
+   * Monkey never receives direct replies - learns by observing sub_spine changes.
    */
   private writeDetections(detections: MonkeyDetection[]): void {
+    if (!this.ledgerWriter) {
+      console.error('[CuriousMonkey] Ledger writer not initialized');
+      return;
+    }
+
     try {
-      // Build JSONL lines
-      const lines = detections.map(detection => {
-        const entry: DetectionLogEntry = {
-          detection,
-          processed: false,
-          paDecision: undefined,
-        };
-        return JSON.stringify(entry);
-      });
+      for (const detection of detections) {
+        // Write to ledger system (ONE-WAY to PA)
+        this.ledgerWriter.writeMonkeyDetection({
+          detectionType: detection.type,
+          agentId: detection.agentId,
+          evidence: detection.evidence,
+          suggestedQuestion: detection.suggestedQuestion,
+          confidence: detection.confidence,
+          severity: detection.severity,
+          location: detection.location,
+        });
+      }
 
-      // Append to JSONL file
-      const content = lines.join('\n') + '\n';
-      fs.appendFileSync(this.detectionsPath, content, 'utf-8');
+      console.log(`[CuriousMonkey] Wrote ${detections.length} detection(s) to ledger`);
 
-      console.log(`[CuriousMonkey] Wrote ${detections.length} detection(s) to ${this.detectionsPath}`);
+      // Also write to legacy file for backward compatibility
+      try {
+        const lines = detections.map(detection => {
+          const entry: DetectionLogEntry = {
+            detection,
+            processed: false,
+            paDecision: undefined,
+          };
+          return JSON.stringify(entry);
+        });
+
+        const content = lines.join('\n') + '\n';
+        fs.appendFileSync(this.detectionsPath, content, 'utf-8');
+      } catch {
+        // Legacy write is optional
+      }
     } catch (error) {
       console.error('[CuriousMonkey] Failed to write detections:', error);
       this.emit('error', { type: 'write_failed', error });

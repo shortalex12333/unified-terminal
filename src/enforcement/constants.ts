@@ -149,7 +149,7 @@ export const CHECK_ACTIVATION: CheckActivationMap = {
   frontend_build: ["responsive-screenshots"],
   post_uninstall: ["uninstall-verify"],
   post_error_fix: ["lesson-template"],
-  cron_30s: ["token-threshold"],
+  cron_30s: [],  // Token monitoring moved to CARL
 };
 
 // ============================================================================

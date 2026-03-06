@@ -89,4 +89,14 @@ export {
   buildSpine,
   compareSpines,
   validateSpineState,
+  capturePreStepSpine,
+  handleWorkAccepted,
 } from "./spine";
+
+// CARL (Context-Aware Resource Limiter)
+export {
+  CARL,
+  getCARL,
+  resetCARL,
+} from "./carl";
+export type { CARLEvents } from "./carl";

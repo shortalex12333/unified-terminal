@@ -478,6 +478,19 @@ export const spineEvents = {
   /** Emitted when spine comparison completes */
   compared: (filesAdded: number, filesModified: number) =>
     emitEvent('spine', 'compared', { filesAdded, filesModified }),
+
+  /** Emitted when Bodyguard passes work to Spine for review and recording */
+  workAccepted: (data: {
+    stepId: string;
+    workOutput: import('../worker/work-output').WorkOutput;
+    verdict: import('../enforcement/types').BodyguardVerdict;
+    acceptedAt: string;
+  }) =>
+    emitEvent('spine', 'work-accepted', data),
+
+  /** Emitted when Spine completes review with "what's next" recommendations */
+  reviewed: (review: import('../ledger/types').SpineReviewPayload) =>
+    emitEvent('spine', 'reviewed', review as unknown as Record<string, unknown>),
 };
 
 export const enforcerEvents = {

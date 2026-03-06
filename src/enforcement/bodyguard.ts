@@ -3,7 +3,8 @@
 // Never sequential. Uses Promise.allSettled to run checks concurrently.
 // Aggregates results into a single verdict: PASS, HARD_FAIL, or SOFT_FAIL.
 
-import { bodyguardEvents } from "../main/events";
+import { bodyguardEvents, spineEvents } from "../main/events";
+import { readWorkOutput, type WorkOutput } from '../worker/work-output';
 import type {
   BodyguardVerdict,
   GateResult,
@@ -109,6 +110,49 @@ function createCheckFromName(checkName: string): EnforcerCheck {
       delayMs: policy.delayMs,
     },
   };
+}
+
+// ============================================================================
+// WORK OUTPUT READING
+// ============================================================================
+
+/**
+ * Read the worker's "show your work" output for validation context.
+ */
+function getWorkOutputForStep(projectRoot: string, stepId: string): WorkOutput | null {
+  try {
+    return readWorkOutput(projectRoot, stepId);
+  } catch (error) {
+    console.warn(`[Bodyguard] Could not read work output for ${stepId}:`, error);
+    return null;
+  }
+}
+
+// ============================================================================
+// SPINE HANDOFF
+// ============================================================================
+
+/**
+ * Pass accepted work to Spine for review and recording.
+ * Spine will:
+ * 1. Acknowledge receipt
+ * 2. Write structured review
+ * 3. Analyze "what's next"
+ * 4. Emit event for PA
+ */
+function passToSpine(
+  stepId: string,
+  workOutput: WorkOutput,
+  verdict: BodyguardVerdict
+): void {
+  console.log(`[Bodyguard] Passing step ${stepId} to Spine`);
+
+  spineEvents.workAccepted({
+    stepId,
+    workOutput,
+    verdict,
+    acceptedAt: new Date().toISOString(),
+  });
 }
 
 // ============================================================================
@@ -269,6 +313,19 @@ export async function gateCheck(
   // Emit pass or fail event based on verdict
   if (verdict.verdict === "PASS") {
     bodyguardEvents.pass(step.id);
+
+    // If passed, hand off to Spine
+    const workOutput = getWorkOutputForStep(projectDir, step.id);
+    if (workOutput) {
+      // Signal Spine to take over
+      passToSpine(step.id, workOutput, {
+        gate: verdict,
+        checksRun: checkDetails.length,
+        checksTimedOut: checkDetails.filter((d) => d.timedOut).length,
+        executionTimeMs: Date.now() - startTime,
+        checkDetails,
+      });
+    }
   } else {
     const failReason = verdict.reasons.join("; ") || "Check(s) failed";
     bodyguardEvents.fail(step.id, failReason);
@@ -301,7 +358,7 @@ function aggregateVerdict(
   let hasSoftFail = false;
   let timedOutCount = 0;
 
-  for (const [checkName, result] of results.entries()) {
+  results.forEach((result, checkName) => {
     if (result.timedOut) {
       timedOutCount++;
     }
@@ -319,7 +376,7 @@ function aggregateVerdict(
         reasons.push(`SOFT FAIL: ${checkName} - ${result.error || "check failed"}`);
       }
     }
-  }
+  });
 
   let verdict: "PASS" | "HARD_FAIL" | "SOFT_FAIL" = "PASS";
   if (hasHardFail) {
