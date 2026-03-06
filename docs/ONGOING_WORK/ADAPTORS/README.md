@@ -22,7 +22,7 @@ const handle = await codex.spawn({
   id: 'task-123',
   name: 'gsd-executor',
   role: 'Execute the plan',
-  model: 'gpt-4o',
+  model: 'gpt-5-codex',
   tools: ['read', 'write', 'bash'],
   maxTokens: 4096,
   prompt: 'Implement feature X according to PLAN.md',

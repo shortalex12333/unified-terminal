@@ -49,6 +49,24 @@ export const TOKEN_THRESHOLDS: Record<
 export const GRACE_THRESHOLD = 0.85;
 
 // ============================================================================
+// CARL (Context-Aware Resource Limiter) — Token estimation and calibration
+// Source: CARL-TASK-SPINE-ARCHITECTURE.md section 2.4, 9.2
+// ============================================================================
+
+// CARL transitions GREEN → AMBER at this fraction of effective budget
+export const AMBER_THRESHOLD = 0.50;
+
+// Characters-to-tokens estimation ratio (calibrated over time via reconciliation)
+export const CARL_INITIAL_RATIO = 0.25;
+
+// Hard bounds on calibration ratio to prevent drift
+export const CARL_RATIO_MIN = 0.15;
+export const CARL_RATIO_MAX = 0.50;
+
+// Exponential moving average weight for ratio updates after reconciliation
+export const CARL_RECONCILIATION_WEIGHT = 0.20;
+
+// ============================================================================
 // BODYGUARD CONSTANTS — Gate checking configuration
 // Source: HARDCODED-ENFORCEMENT-VALUES.md section 25
 // ============================================================================

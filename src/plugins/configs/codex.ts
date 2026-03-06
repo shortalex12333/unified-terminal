@@ -36,7 +36,7 @@ export const CODEX_PLUGIN: PluginConfig = {
     'utility',
   ],
   requiresAuth: true,
-  requiredEnv: ['OPENAI_API_KEY'],
+  requiredEnv: [], // Codex uses OAuth via `codex --login`, not API keys
   timeout: 300000, // 5 minute timeout for code generation
 };
 

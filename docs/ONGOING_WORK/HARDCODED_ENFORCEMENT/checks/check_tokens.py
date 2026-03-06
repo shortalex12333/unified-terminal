@@ -15,14 +15,11 @@ import os
 
 # From HARDCODED-ENFORCEMENT-VALUES.md section 1
 TOKEN_THRESHOLDS = {
-    "claude-sonnet-4":  {"window": 200_000,   "killAt": 0.55, "effective": 110_000},
-    "claude-opus-4":    {"window": 200_000,   "killAt": 0.65, "effective": 130_000},
-    "gpt-4o":           {"window": 128_000,   "killAt": 0.60, "effective": 76_800},
-    "gpt-4o-mini":      {"window": 128_000,   "killAt": 0.50, "effective": 64_000},
-    "o3":               {"window": 200_000,   "killAt": 0.65, "effective": 130_000},
-    "gemini-pro":       {"window": 1_000_000, "killAt": 0.60, "effective": 600_000},
-    "gemini-flash":     {"window": 1_000_000, "killAt": 0.50, "effective": 500_000},
-    "default":          {"window": 128_000,   "killAt": 0.55, "effective": 70_400},
+    "claude-sonnet-4":  {"window": 200_000,   "killAt": 0.55, "effective": 110_000, "maxOutput": 64_000},
+    "claude-opus-4":    {"window": 200_000,   "killAt": 0.65, "effective": 130_000, "maxOutput": 64_000},
+    "gpt-5-codex":      {"window": 400_000,   "killAt": 0.60, "effective": 240_000, "maxOutput": 128_000},
+    "gpt-5":            {"window": 400_000,   "killAt": 0.60, "effective": 240_000, "maxOutput": 128_000},
+    "default":          {"window": 400_000,   "killAt": 0.55, "effective": 220_000, "maxOutput": 128_000},
 }
 
 # From HARDCODED-ENFORCEMENT-VALUES.md section 1

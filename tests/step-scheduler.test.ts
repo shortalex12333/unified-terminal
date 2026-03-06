@@ -48,6 +48,313 @@ require.cache[require.resolve('electron')] = {
 };
 
 // ============================================================================
+// MOCK ENFORCEMENT ENGINE COMPONENTS (must be before importing step-scheduler)
+// ============================================================================
+// The step-scheduler imports enforcement, skills, glue, and adapter modules.
+// These modules try to run actual Python check scripts, spawn Codex agents,
+// read trigger-map.json, etc. — none of which exist in the test environment.
+// We mock them all to return safe defaults.
+
+import * as path from 'path';
+
+const srcDir = path.resolve(__dirname, '..', 'src');
+
+// Helper to inject a mock module into require.cache
+function mockModule(modulePath: string, exports: Record<string, any>): void {
+  // @ts-ignore - mocking modules
+  require.cache[modulePath] = {
+    id: modulePath,
+    filename: modulePath,
+    loaded: true,
+    exports,
+  };
+}
+
+// --- Mock: src/main/events.ts (used by bodyguard, spine, enforcer) ---
+const noopFn = (..._args: any[]) => {};
+const mockSystemEvents = {
+  emitStatus: noopFn,
+  onStatus: () => noopFn,
+  onSource: () => noopFn,
+  onAll: () => noopFn,
+  emit: noopFn,
+  on: noopFn,
+  off: noopFn,
+};
+
+const mockEventEmitters = {
+  bodyguardEvents: { gateStart: noopFn, checking: noopFn, checkComplete: noopFn, pass: noopFn, fail: noopFn, failHeuristic: noopFn, failDefinitive: noopFn },
+  spineEvents: { refreshed: noopFn, compared: noopFn, buildStart: noopFn, buildComplete: noopFn },
+  schedulerEvents: { planStart: noopFn, stepStart: noopFn, stepProgress: noopFn, stepDone: noopFn, stepFailed: noopFn, stepSkipped: noopFn, needsUser: noopFn, planComplete: noopFn },
+  enforcerEvents: { checkRun: noopFn, checkStart: noopFn, checkPass: noopFn, checkFail: noopFn, checkTimeout: noopFn },
+  conductorEvents: { classifyStart: noopFn, classifyComplete: noopFn, planReady: noopFn, replan: noopFn, sessionStart: noopFn, error: noopFn },
+  workerEvents: { spawn: noopFn, fileCreated: noopFn, fileModified: noopFn, complete: noopFn, error: noopFn, timeout: noopFn },
+  rateLimitEvents: { hit: noopFn, deferred: noopFn, resumed: noopFn },
+  imageGenEvents: { start: noopFn, progress: noopFn, complete: noopFn, error: noopFn },
+  deployEvents: { start: noopFn, progress: noopFn, complete: noopFn, error: noopFn },
+  gitEvents: { start: noopFn, complete: noopFn, commit: noopFn, push: noopFn },
+  paEvents: { querySent: noopFn, queryResponse: noopFn, queryTimeout: noopFn, interruptRouted: noopFn },
+  systemEvents: mockSystemEvents,
+  emit: noopFn,
+  emitEvent: noopFn,
+};
+
+mockModule(path.resolve(srcDir, 'main', 'events.ts'), mockEventEmitters);
+
+// --- Mock: src/enforcement/constants.ts ---
+const mockCircuitBreaker = {
+  MAX_STEP_RETRIES: 3,
+  DEFINITIVE_FAIL_RETRIES: 0,
+  HEURISTIC_FAIL_OPTIONS: ['retry', 'skip', 'stop'] as const,
+  DEFINITIVE_FAIL_OPTIONS: ['retry', 'stop'] as const,
+};
+
+const mockEnforcerRetryPolicies: Record<string, any> = {
+  'test-exit-code': { attempts: 1, delayMs: 0, confidence: 'definitive' },
+  'file-existence': { attempts: 1, delayMs: 0, confidence: 'definitive' },
+  'file-non-empty': { attempts: 1, delayMs: 0, confidence: 'heuristic' },
+};
+
+const mockCheckActivation = {
+  every_execute: ['file-existence'],
+  code_modified: [],
+  tier_2_plus: [],
+  post_build: [],
+  pre_deploy: [],
+  frontend_build: [],
+  post_uninstall: [],
+  post_error_fix: [],
+  cron_30s: [],
+};
+
+const mockEnforcementConstants = {
+  TOKEN_THRESHOLDS: {},
+  GRACE_THRESHOLD: 0.85,
+  MAX_PARALLEL_CHECKS: 5,
+  CHECK_TIMEOUT_MS: 10_000,
+  TOTAL_GATE_TIMEOUT_MS: 120_000,
+  PARTIAL_TIMEOUT_POLICY: 'fail_timed_out_only',
+  MIXED_RESULT_POLICY: 'hard_fails_block_soft_fails_warn',
+  MIN_CHECKS_REQUIRED: 1,
+  MODEL_ROUTING: {},
+  ENFORCER_RETRY_POLICIES: mockEnforcerRetryPolicies,
+  CHECK_ACTIVATION: mockCheckActivation,
+  CHECK_SCRIPT_PATHS: {},
+  CRON_INTERVALS: {},
+  TIMEOUTS: {},
+  FILE_THRESHOLDS: {},
+  TIER_CLASSIFICATION: {},
+  MAX_OVERHEAD_PERCENT: 10,
+  PROJECT_STATE: {},
+  SUB_AGENT_RULES: {},
+  CIRCUIT_BREAKER: mockCircuitBreaker,
+  PHASE_BUDGET_WEIGHTS: {},
+  CODEX_SANDBOX: {},
+  CLAUDE_TOOL_MAP: {},
+  GEMINI_TOOL_MAP: {},
+  DEPLOY_HEALTH: {},
+  RATE_LIMIT_PATTERNS: [],
+  RATE_LIMIT_DEFAULT_WAIT_MS: 3_600_000,
+  RATE_LIMIT_RETRY_AFTER_RESUME_MS: 300_000,
+  DOM_POLLING: {},
+  LATENCY_BUDGET: {},
+  SKILL_INJECTOR: {},
+  LESSON_VALIDATION: {},
+  SCOPE_WHITELIST: {},
+  RESPONSIVE_VIEWPORTS: [],
+  INTAKE: {},
+  MEMORY_CONSTRAINTS: {},
+};
+
+mockModule(path.resolve(srcDir, 'enforcement', 'constants.ts'), mockEnforcementConstants);
+
+// --- Mock: src/enforcement/types.ts (types only — empty exports) ---
+mockModule(path.resolve(srcDir, 'enforcement', 'types.ts'), {});
+
+// --- Mock: src/enforcement/enforcer.ts ---
+mockModule(path.resolve(srcDir, 'enforcement', 'enforcer.ts'), {
+  runCheck: async () => ({ passed: true, output: 'mock', timedOut: false }),
+  runCheckWithRetry: async () => ({ passed: true, output: 'mock', timedOut: false }),
+  validateCheckOutput: () => true,
+});
+
+// --- Mock: src/enforcement/bodyguard.ts ---
+const mockGateCheck = async (_step: any, _projectDir: string) => ({
+  gate: { verdict: 'PASS', reasons: [], checksRun: 0, checksTimedOut: 0, checksSkipped: 0 },
+  checksRun: 0,
+  checksTimedOut: 0,
+  executionTimeMs: 1,
+  checkDetails: [],
+});
+
+mockModule(path.resolve(srcDir, 'enforcement', 'bodyguard.ts'), {
+  gateCheck: mockGateCheck,
+  checkCompliance: () => true,
+});
+
+// --- Mock: src/enforcement/spine.ts ---
+const mockBuildSpine = async (_projectDir: string, _dagProgress?: any) => ({
+  timestamp: Date.now(),
+  projectDir: _projectDir || process.cwd(),
+  files: { total: 0, byType: {}, list: [] },
+  gitStatus: { branch: 'main', uncommitted: [], untracked: [] },
+  projectState: 'OPEN',
+  lastActivity: Date.now(),
+  dagProgress: { totalSteps: 0, completedSteps: 0, failedSteps: [], currentStep: undefined },
+  errors: [],
+});
+
+const mockCompareSpines = (_before: any, _after: any) => ({
+  filesAdded: [],
+  filesModified: [],
+  filesRemoved: [],
+  gitChanges: { uncommittedBefore: [], uncommittedAfter: [], untrackedBefore: [], untrackedAfter: [] },
+  testStateChanged: false,
+  buildStateChanged: false,
+});
+
+mockModule(path.resolve(srcDir, 'enforcement', 'spine.ts'), {
+  buildSpine: mockBuildSpine,
+  compareSpines: mockCompareSpines,
+  validateSpineState: () => true,
+});
+
+// --- Mock: src/enforcement/index.ts (barrel) ---
+mockModule(path.resolve(srcDir, 'enforcement', 'index.ts'), {
+  ...mockEnforcementConstants,
+  gateCheck: mockGateCheck,
+  checkCompliance: () => true,
+  buildSpine: mockBuildSpine,
+  compareSpines: mockCompareSpines,
+  validateSpineState: () => true,
+  runCheck: async () => ({ passed: true, output: 'mock', timedOut: false }),
+  runCheckWithRetry: async () => ({ passed: true, output: 'mock', timedOut: false }),
+  validateCheckOutput: () => true,
+});
+
+// --- Mock: src/adapters/types.ts (types only) ---
+mockModule(path.resolve(srcDir, 'adapters', 'types.ts'), {});
+
+// --- Mock: src/adapters/permissions.ts ---
+mockModule(path.resolve(srcDir, 'adapters', 'permissions.ts'), {
+  checkPermission: () => true,
+});
+
+// --- Mock: src/adapters/codex/adapter.ts ---
+mockModule(path.resolve(srcDir, 'adapters', 'codex', 'adapter.ts'), {
+  CodexAdapter: class MockCodexAdapter {
+    runtime = 'codex';
+    capabilities() { return { sessionResume: false, jsonOutput: true, toolPermissions: true, maxPromptTokens: 400000, supportedTools: [], models: { fast: 'gpt-5-codex', standard: 'gpt-5-codex', reasoning: 'gpt-5' } }; }
+    async isAvailable() { return false; }
+    async spawn() { throw new Error('Mock: spawn not available'); }
+    async kill() {}
+  },
+});
+
+// --- Mock: src/adapters/claude/adapter.ts ---
+mockModule(path.resolve(srcDir, 'adapters', 'claude', 'adapter.ts'), {
+  ClaudeAdapter: class MockClaudeAdapter {
+    runtime = 'claude';
+    capabilities() { return { sessionResume: false, jsonOutput: true, toolPermissions: true, maxPromptTokens: 200000, supportedTools: [], models: { fast: 'claude-haiku-4', standard: 'claude-sonnet-4', reasoning: 'claude-opus-4' } }; }
+    async isAvailable() { return false; }
+    async spawn() { throw new Error('Mock: spawn not available'); }
+    async kill() {}
+  },
+});
+
+// --- Mock: src/adapters/factory.ts ---
+mockModule(path.resolve(srcDir, 'adapters', 'factory.ts'), {
+  getAdapter: (_runtime: string) => ({
+    runtime: _runtime,
+    capabilities: () => ({ sessionResume: false, jsonOutput: true, toolPermissions: true, maxPromptTokens: 400000, supportedTools: [], models: {} }),
+    isAvailable: async () => false,
+    spawn: async () => { throw new Error('Mock: spawn not available'); },
+    kill: async () => {},
+  }),
+  getAvailableRuntimes: async () => [],
+  selectRuntime: () => 'codex',
+  clearAdapterCache: () => {},
+  CodexAdapter: class {},
+  ClaudeAdapter: class {},
+});
+
+// --- Mock: src/skills/selector.ts ---
+mockModule(path.resolve(srcDir, 'skills', 'selector.ts'), {
+  selectSkills: async () => ({ skills: [], reasoning: 'Mock: no skills selected' }),
+});
+
+// --- Mock: src/skills/validator.ts ---
+mockModule(path.resolve(srcDir, 'skills', 'validator.ts'), {
+  validateSelection: (selection: any) => selection || { skills: [], reasoning: 'Mock' },
+  MAX_SKILLS_PER_WORKER: 3,
+  MAX_SKILL_INJECTION_TOKENS: 2000,
+});
+
+// --- Mock: src/skills/verify-parser.ts ---
+mockModule(path.resolve(srcDir, 'skills', 'verify-parser.ts'), {
+  parseVerifyBlock: () => [],
+});
+
+// --- Mock: src/skills/critical-checks.ts ---
+mockModule(path.resolve(srcDir, 'skills', 'critical-checks.ts'), {
+  CRITICAL_SKILL_CHECKS: {},
+  getChecksForSkill: () => [],
+});
+
+// --- Mock: src/skills/verify-sandbox.ts ---
+mockModule(path.resolve(srcDir, 'skills', 'verify-sandbox.ts'), {
+  isCommandAllowed: () => ({ allowed: false, reason: 'Mock: disabled in tests' }),
+  executeVerifyCommand: async () => ({ exitCode: 0, stdout: '', stderr: '' }),
+});
+
+// --- Mock: src/skills/index.ts (barrel) ---
+mockModule(path.resolve(srcDir, 'skills', 'index.ts'), {
+  selectSkills: async () => ({ skills: [], reasoning: 'Mock: no skills selected' }),
+  validateSelection: (selection: any) => selection || { skills: [], reasoning: 'Mock' },
+  MAX_SKILLS_PER_WORKER: 3,
+  MAX_SKILL_INJECTION_TOKENS: 2000,
+  parseVerifyBlock: () => [],
+  CRITICAL_SKILL_CHECKS: {},
+  getChecksForSkill: () => [],
+  isCommandAllowed: () => ({ allowed: false, reason: 'Mock: disabled in tests' }),
+  executeVerifyCommand: async () => ({ exitCode: 0, stdout: '', stderr: '' }),
+});
+
+// --- Mock: src/glue/assemble-prompt.ts ---
+mockModule(path.resolve(srcDir, 'glue', 'assemble-prompt.ts'), {
+  assemblePrompt: (_options: any) => ({
+    skillSections: '',
+    spineContext: '<spine_context>{}</spine_context>',
+    userInput: _options?.userInput || '',
+    totalTokens: 0,
+  }),
+});
+
+// --- Mock: src/glue/normalizer.ts ---
+mockModule(path.resolve(srcDir, 'glue', 'normalizer.ts'), {
+  normalize: (_step: any, _result: any, _projectDir: string) => ({
+    step: { id: _step?.id || 0, action: _step?.action || '', detail: _step?.detail || '', declaredFiles: [], tier: 1, isFrontend: false, modifiedCodeFiles: false },
+    result: { status: 'completed', output: '', filesCreated: [], filesModified: [], tokensUsed: { input: 0, output: 0 }, exitCode: 0 },
+    projectDir: _projectDir || process.cwd(),
+  }),
+});
+
+// --- Mock: src/glue/index.ts (barrel) ---
+mockModule(path.resolve(srcDir, 'glue', 'index.ts'), {
+  assemblePrompt: (_options: any) => ({
+    skillSections: '',
+    spineContext: '<spine_context>{}</spine_context>',
+    userInput: _options?.userInput || '',
+    totalTokens: 0,
+  }),
+  normalize: (_step: any, _result: any, _projectDir: string) => ({
+    step: { id: _step?.id || 0, action: _step?.action || '', detail: _step?.detail || '', declaredFiles: [], tier: 1, isFrontend: false, modifiedCodeFiles: false },
+    result: { status: 'completed', output: '', filesCreated: [], filesModified: [], tokensUsed: { input: 0, output: 0 }, exitCode: 0 },
+    projectDir: _projectDir || process.cwd(),
+  }),
+});
+
+// ============================================================================
 // IMPORTS (after mocking)
 // ============================================================================
 

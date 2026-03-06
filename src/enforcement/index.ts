@@ -63,6 +63,11 @@ export {
   RESPONSIVE_VIEWPORTS,
   INTAKE,
   MEMORY_CONSTRAINTS,
+  AMBER_THRESHOLD,
+  CARL_INITIAL_RATIO,
+  CARL_RATIO_MIN,
+  CARL_RATIO_MAX,
+  CARL_RECONCILIATION_WEIGHT,
 } from "./constants";
 export type { CheckActivationMap } from "./constants";
 

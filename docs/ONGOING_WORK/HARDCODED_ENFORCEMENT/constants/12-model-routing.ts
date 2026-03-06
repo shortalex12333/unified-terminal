@@ -9,19 +9,14 @@ export interface ModelRouting {
 
 export const MODEL_ROUTING: Record<string, ModelRouting> = {
   codex: {
-    fast: "gpt-4o-mini", // Tier 1 simple tasks
-    standard: "gpt-4o", // Tier 2 medium tasks (default)
-    reasoning: "o3", // Tier 3 complex planning
+    fast: "gpt-5-codex", // Optimized for coding tasks with many tools
+    standard: "gpt-5-codex", // Default for all coding/agent work
+    reasoning: "gpt-5", // Broad world knowledge with strong general reasoning
   },
   claude: {
     fast: "claude-haiku-4",
     standard: "claude-sonnet-4",
     reasoning: "claude-opus-4",
-  },
-  gemini: {
-    fast: "gemini-flash",
-    standard: "gemini-pro",
-    reasoning: "gemini-pro", // no separate reasoning model
   },
   chatgpt_web: {
     // Model determined by user's ChatGPT subscription, not our choice

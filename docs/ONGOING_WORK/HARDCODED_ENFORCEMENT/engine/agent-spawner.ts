@@ -241,18 +241,18 @@ function selectModel(
 ): string {
   const routing = MODEL_ROUTING[runtime as keyof typeof MODEL_ROUTING];
   if (!routing) {
-    return "gpt-4o";
+    return "gpt-5-codex";
   }
 
   switch (tier) {
     case 1:
-      return routing.fast || "gpt-4o-mini";
+      return routing.fast || "gpt-5-codex";
     case 2:
-      return routing.standard || "gpt-4o";
+      return routing.standard || "gpt-5-codex";
     case 3:
-      return routing.reasoning || "o3";
+      return routing.reasoning || "gpt-5";
     default:
-      return routing.standard || "gpt-4o";
+      return routing.standard || "gpt-5-codex";
   }
 }
 

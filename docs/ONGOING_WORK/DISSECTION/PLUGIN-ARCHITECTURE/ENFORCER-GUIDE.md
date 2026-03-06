@@ -261,12 +261,10 @@ Special section in ENFORCER.json for token management:
 {
   "context-warden": {
     "thresholds": {
-      "claude-sonnet-4": { "window": 200000, "kill_at_percent": 55 },
-      "claude-opus-4": { "window": 200000, "kill_at_percent": 65 },
-      "gpt-4o": { "window": 128000, "kill_at_percent": 60 },
-      "gpt-4o-mini": { "window": 128000, "kill_at_percent": 50 },
-      "gemini-pro": { "window": 1000000, "kill_at_percent": 60 },
-      "gemini-flash": { "window": 1000000, "kill_at_percent": 50 }
+      "claude-sonnet-4": { "window": 200000, "kill_at_percent": 55, "max_output": 64000 },
+      "claude-opus-4": { "window": 200000, "kill_at_percent": 65, "max_output": 64000 },
+      "gpt-5-codex": { "window": 400000, "kill_at_percent": 60, "max_output": 128000 },
+      "gpt-5": { "window": 400000, "kill_at_percent": 60, "max_output": 128000 }
     },
     "grace_period": {
       "condition": "tokenUsage > threshold AND taskProgress > 0.85",

@@ -180,7 +180,7 @@ async function verifyPluginThroughAdapter() {
     id: crypto.randomUUID(),
     name: 'gsd-planner',
     role: 'Decompose task into steps',
-    model: 'gpt-4o',
+    model: 'gpt-5-codex',
     tools: ['read', 'bash'],  // What the plugin ACTUALLY needs
     maxTokens: 4096,
     prompt: plannerPrompt + '\n\nTask: Add a contact form to an existing Next.js site.',
@@ -225,7 +225,7 @@ async function verifyPluginThroughAdapter() {
     id: crypto.randomUUID(),
     name: 'gsd-executor',
     role: 'Create the contact form component',
-    model: 'gpt-4o',
+    model: 'gpt-5-codex',
     tools: ['read', 'write', 'bash'],
     maxTokens: 4096,
     prompt: executorPrompt + '\n\nTask: Create src/components/ContactForm.tsx with name, email, message fields.',
@@ -255,7 +255,7 @@ async function verifyPluginThroughAdapter() {
     id: crypto.randomUUID(),
     name: 'code-reviewer',
     role: 'Review the contact form',
-    model: 'gpt-4o',
+    model: 'gpt-5-codex',
     tools: ['read'],  // STRICTLY read-only
     maxTokens: 4096,
     prompt: reviewerPrompt + '\n\nReview: src/components/ContactForm.tsx',

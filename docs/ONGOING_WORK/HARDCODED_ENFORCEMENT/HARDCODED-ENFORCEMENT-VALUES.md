@@ -15,15 +15,12 @@ Source files referenced: HARD-RAILS.md, DOMAIN-G-TIERED-ENFORCEMENT.md, DOMAIN-F
 These are the exact values for when to KILL an agent and respawn at the current step. Source: DOMAIN-G-TIERED-ENFORCEMENT.md, HARD-RAILS.md.
 
 ```typescript
-const TOKEN_THRESHOLDS: Record<string, { window: number; killAt: number; effective: number }> = {
-  "claude-sonnet-4":  { window: 200_000,   killAt: 0.55, effective: 110_000 },
-  "claude-opus-4":    { window: 200_000,   killAt: 0.65, effective: 130_000 },
-  "gpt-4o":           { window: 128_000,   killAt: 0.60, effective: 76_800  },
-  "gpt-4o-mini":      { window: 128_000,   killAt: 0.50, effective: 64_000  },
-  "o3":               { window: 200_000,   killAt: 0.65, effective: 130_000 },
-  "gemini-pro":       { window: 1_000_000, killAt: 0.60, effective: 600_000 },
-  "gemini-flash":     { window: 1_000_000, killAt: 0.50, effective: 500_000 },
-  "default":          { window: 128_000,   killAt: 0.55, effective: 70_400  },
+const TOKEN_THRESHOLDS: Record<string, { window: number; killAt: number; effective: number; maxOutput: number }> = {
+  "claude-sonnet-4":  { window: 200_000,   killAt: 0.55, effective: 110_000, maxOutput: 64_000  },
+  "claude-opus-4":    { window: 200_000,   killAt: 0.65, effective: 130_000, maxOutput: 64_000  },
+  "gpt-5-codex":      { window: 400_000,   killAt: 0.60, effective: 240_000, maxOutput: 128_000 },
+  "gpt-5":            { window: 400_000,   killAt: 0.60, effective: 240_000, maxOutput: 128_000 },
+  "default":          { window: 400_000,   killAt: 0.55, effective: 220_000, maxOutput: 128_000 },
 };
 ```
 
@@ -556,19 +553,14 @@ Which model handles which task tier per runtime. Source: ADAPTERS.md, AGENT-TOPO
 ```typescript
 const MODEL_ROUTING = {
   codex: {
-    fast:      "gpt-4o-mini",    // Tier 1 simple tasks
-    standard:  "gpt-4o",         // Tier 2 medium tasks (default)
-    reasoning: "o3",             // Tier 3 complex planning
+    fast:      "gpt-5-codex",    // Optimized for coding tasks with many tools
+    standard:  "gpt-5-codex",    // Default for all coding/agent work
+    reasoning: "gpt-5",          // Broad world knowledge with strong general reasoning
   },
   claude: {
     fast:      "claude-haiku-4",
     standard:  "claude-sonnet-4",
     reasoning: "claude-opus-4",
-  },
-  gemini: {
-    fast:      "gemini-flash",
-    standard:  "gemini-pro",
-    reasoning: "gemini-pro",     // no separate reasoning model
   },
   chatgpt_web: {
     // Model determined by user's ChatGPT subscription, not our choice

@@ -296,7 +296,7 @@ active_agents:
     status: working
     task: "Orchestrating phase 3 implementation"
     token_used: 45000
-    token_limit: 200000
+    token_limit: 400000
     token_percent: 22.5
     started: 2026-03-03T13:00:00Z
   - id: pa-1
@@ -607,7 +607,7 @@ active_agents:
     status: working
     task: "Orchestrating phase 3 implementation"
     token_used: 45000
-    token_limit: 200000
+    token_limit: 400000
     token_percent: 22.5
     started: 2026-03-03T13:00:00Z
 
