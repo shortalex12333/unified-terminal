@@ -223,6 +223,12 @@ import { getCLIExecutor, cleanupCLIExecutor as cleanupCLIExec } from './executor
 import { createWebExecutor } from './executors/web-executor';
 import { getServiceExecutor, cleanupServiceExecutor } from './executors/service-executor';
 
+// Progress Monitor (Phase 12: File-based progress architecture)
+import { FileBridge } from './file-bridge';
+import { createProjectStructure, sanitizeProjectName } from './project-scaffold';
+import { setCurrentProject } from './events';
+import * as crypto from 'crypto';
+
 // ============================================================================
 // TEST MODE FLAG
 // ============================================================================
@@ -386,6 +392,9 @@ let chatGPTView: BrowserView | null = null;
 
 // Track OAuth popup windows so we can manage them
 const oauthWindows: Set<BrowserWindow> = new Set();
+
+// Progress Monitor: FileBridge instance for current project
+let fileBridge: FileBridge | null = null;
 
 // ============================================================================
 // SINGLE INSTANCE LOCK
@@ -1118,6 +1127,9 @@ app.on('will-quit', async () => {
   // Kill all CLI processes and cleanup
   console.log('[App] Shutting down...');
 
+  // Stop file bridge
+  fileBridge?.stop();
+
   // Save state and cleanup (Gate 11)
   cleanupStateManager();
   cleanupTrayManager();
@@ -1558,9 +1570,14 @@ import { classifyLocally } from './local-classifier';
 import { spawn as spawnChild } from 'child_process';
 import { backendTerminal } from './dev-logger';
 
-ipcMain.handle('conductor:send', async (event, message: string): Promise<void> => {
+ipcMain.handle('conductor:send', async (_event, message: string): Promise<void> => {
   console.log('[IPC] conductor:send called:', message.substring(0, 50) + '...');
-  const window = BrowserWindow.fromWebContents(event.sender);
+
+  // Use mainWindow directly - event.sender doesn't work reliably with Vite
+  if (!mainWindow) {
+    console.error('[IPC] conductor:send - No main window!');
+    return;
+  }
 
   try {
     // Quick local classification for context
@@ -1568,12 +1585,12 @@ ipcMain.handle('conductor:send', async (event, message: string): Promise<void> =
     console.log('[IPC] Classification:', classification.projectType);
 
     // Notify UI
-    window?.webContents.send('conductor:status', {
+    mainWindow.webContents.send('conductor:status', {
       status: 'executing',
       message: `Building ${classification.projectType} project...`,
     });
 
-    window?.webContents.send('conductor:output', {
+    mainWindow.webContents.send('conductor:output', {
       type: 'chunk',
       content: `**Starting:** ${classification.suggestedName} (${classification.projectType})\n\n`,
     });
@@ -1604,7 +1621,7 @@ ipcMain.handle('conductor:send', async (event, message: string): Promise<void> =
     claude.stdout?.on('data', (data: Buffer) => {
       const chunk = data.toString();
       backendTerminal.stdout(sessionId, chunk);
-      window?.webContents.send('conductor:output', {
+      mainWindow?.webContents.send('conductor:output', {
         type: 'chunk',
         content: chunk,
       });
@@ -1615,7 +1632,7 @@ ipcMain.handle('conductor:send', async (event, message: string): Promise<void> =
       const chunk = data.toString();
       backendTerminal.stderr(sessionId, chunk);
       if (chunk.toLowerCase().includes('error')) {
-        window?.webContents.send('conductor:output', {
+        mainWindow?.webContents.send('conductor:output', {
           type: 'chunk',
           content: `⚠️ ${chunk}`,
         });
@@ -1627,37 +1644,37 @@ ipcMain.handle('conductor:send', async (event, message: string): Promise<void> =
       backendTerminal.agentExit(sessionId, code ?? 0);
 
       if (code === 0) {
-        window?.webContents.send('conductor:output', {
+        mainWindow?.webContents.send('conductor:output', {
           type: 'chunk',
           content: `\n\n✅ **Done!** Project at: ${projectDir}`,
         });
-        window?.webContents.send('conductor:output', { type: 'complete', content: '' });
-        window?.webContents.send('conductor:status', { status: 'done' });
+        mainWindow?.webContents.send('conductor:output', { type: 'complete', content: '' });
+        mainWindow?.webContents.send('conductor:status', { status: 'done' });
       } else {
-        window?.webContents.send('conductor:output', {
+        mainWindow?.webContents.send('conductor:output', {
           type: 'error',
           content: `Build exited with code ${code}`,
         });
-        window?.webContents.send('conductor:status', { status: 'error', message: `Exit ${code}` });
+        mainWindow?.webContents.send('conductor:status', { status: 'error', message: `Exit ${code}` });
       }
     });
 
     claude.on('error', (err) => {
       backendTerminal.agentExit(sessionId, -1);
-      window?.webContents.send('conductor:output', {
+      mainWindow?.webContents.send('conductor:output', {
         type: 'error',
         content: `Failed to start Claude: ${err.message}`,
       });
-      window?.webContents.send('conductor:status', { status: 'error', message: err.message });
+      mainWindow?.webContents.send('conductor:status', { status: 'error', message: err.message });
     });
 
   } catch (err) {
     console.error('[IPC] conductor:send error:', err);
-    window?.webContents.send('conductor:output', {
+    mainWindow?.webContents.send('conductor:output', {
       type: 'error',
       content: err instanceof Error ? err.message : String(err),
     });
-    window?.webContents.send('conductor:status', {
+    mainWindow?.webContents.send('conductor:status', {
       status: 'error',
       message: err instanceof Error ? err.message : String(err),
     });
@@ -3245,6 +3262,65 @@ ipcMain.handle('mcp:refresh-token', async (
   console.log(`[IPC] mcp:refresh-token called: ${serverId}`);
   const mcpManager = getMCPManager();
   return mcpManager.refreshToken(serverId);
+});
+
+// ============================================================================
+// PROJECT IPC HANDLERS (Progress Monitor)
+// ============================================================================
+
+/**
+ * IPC: Start new project
+ * Creates folder structure, initializes FileBridge, and starts file watching
+ */
+ipcMain.handle('project:start', async (_event, prompt: string): Promise<{ projectId: string; projectName: string }> => {
+  console.log('[IPC] project:start called');
+  const projectId = crypto.randomUUID();
+  const projectName = sanitizeProjectName(prompt.slice(0, 50));  // First 50 chars as name
+
+  // Create folder structures
+  const paths = createProjectStructure(projectId, projectName);
+
+  // Set current project for events.ts
+  setCurrentProject(projectId);
+
+  // Start file bridge
+  fileBridge?.stop();  // Stop any existing bridge
+  fileBridge = new FileBridge(projectId, projectName);
+  if (mainWindow) {
+    fileBridge.setMainWindow(mainWindow);
+  }
+  fileBridge.start();
+
+  return { projectId, projectName };
+});
+
+/**
+ * IPC: Respond to action (MCP connect, circuit breaker choice)
+ */
+ipcMain.handle('project:respond-action', async (_event, action: string): Promise<void> => {
+  // TODO: Route action to appropriate handler
+  console.log('[IPC] project:respond-action:', action);
+});
+
+/**
+ * IPC: Open folder in Finder
+ */
+ipcMain.handle('project:open-folder', async (_event, folderPath: string): Promise<void> => {
+  shell.openPath(folderPath);
+});
+
+/**
+ * IPC: Open file in default application
+ */
+ipcMain.handle('project:open-file', async (_event, filePath: string): Promise<void> => {
+  shell.openPath(filePath);
+});
+
+/**
+ * IPC: Open URL in browser
+ */
+ipcMain.handle('project:open-url', async (_event, url: string): Promise<void> => {
+  shell.openExternal(url);
 });
 
 // ============================================================================

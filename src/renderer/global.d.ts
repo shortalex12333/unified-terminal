@@ -922,6 +922,12 @@ declare interface ElectronAPI {
       summary: { pages: number; components: number };
     }) => void) => () => void;
 
+    /** Start a new project with a prompt */
+    start: (prompt: string) => Promise<{ projectId: string; projectName: string }>;
+
+    /** Respond to an action overlay (MCP connect, circuit breaker choice) */
+    respondToAction: (action: string) => Promise<void>;
+
     /** Open a folder in Finder/Explorer */
     openFolder: (path: string) => Promise<void>;
 
