@@ -79,7 +79,7 @@ Plans:
 ### Phase 12: File-Based Progress Monitor
 **Status:** Planning Complete
 **Goal:** Replace chat mirror with file-based transposition. User sees progress tree + output files, never LLM interface.
-**Plans:** 6 plans in 3 waves
+**Plans:** 6/6 plans complete
 **Requirements:** [PM-01, PM-02, PM-03, PM-04, PM-05, PM-06, PM-07, PM-08, PM-09, PM-10, PM-11, PM-12]
 
 Plans:
