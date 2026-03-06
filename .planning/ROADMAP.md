@@ -1,6 +1,6 @@
 # Unified Terminal — Roadmap
 
-## Milestone: v1.0 — Production-Ready Enforcement Pipeline
+## Milestone: v1.0 — Production-Ready Enforcement Pipeline (COMPLETE)
 
 ### Phase 1: Enforcement Spec
 **Status:** Complete
@@ -64,6 +64,104 @@ Plans:
 - [x] 10-03-PLAN.md — Production readiness checklist document (16 criteria) + GAP-005 closure + human verification
 
 **Summary:** 10 E2E tests, 4 compatibility checks, 13-check production readiness script, 16-point checklist -- all passing. GAP-005 RESOLVED. 480+ total tests. Milestone v1.0 COMPLETE.
+
+---
+
+## Milestone: v2.0 — Primary Input Architecture
+
+### Phase 11: Classification Layer
+**Status:** Not Started
+**Goal:** Build project type classifier and capability registry. Foundation for intelligent routing.
+
+**Deliverables:**
+- `src/main/classification/types.ts` — Type definitions (~80 lines)
+- `src/main/classification/capability-registry.ts` — Hardcoded mapping (~150 lines)
+- `src/main/classification/project-classifier.ts` — Cheap Codex agent (~120 lines)
+- `src/main/classification/index.ts` — Barrel exports (~10 lines)
+- Unit tests for classifier and registry
+
+**Requirements Covered:** R2, R3
+
+### Phase 12: Brief System
+**Status:** Not Started
+**Goal:** Build template-driven brief generation with targeted questions and hard validation.
+
+**Deliverables:**
+- `src/main/brief/types.ts` — Brief interfaces (~100 lines)
+- `src/main/brief/templates/*.ts` — Templates for site, app, ecom, existing (~310 lines)
+- `src/main/brief/brief-generator.ts` — Creates brief from intent (~80 lines)
+- `src/main/brief/brief-agent.ts` — Asks targeted questions (~150 lines)
+- `src/main/brief/brief-validator.ts` — Hard rail validation (~100 lines)
+- `src/main/brief/index.ts` — Barrel exports (~15 lines)
+- Unit tests for templates, agent, validator
+
+**Requirements Covered:** R4, R5, R6
+
+### Phase 13: Entry Router & Orchestration
+**Status:** Not Started
+**Goal:** Route user choice to correct flow. Connect classification → brief → conductor.
+
+**Deliverables:**
+- `src/main/orchestration/entry-router.ts` — Flow routing logic (~80 lines)
+- `src/main/orchestration/index.ts` — Barrel exports (~10 lines)
+- MCP checker integration with mcp-manager.ts
+- IPC handlers for entry routing
+
+**Requirements Covered:** R7, R8
+
+### Phase 14: UI Components
+**Status:** Not Started
+**Goal:** Build React components for primary input flow.
+
+**Deliverables:**
+- `src/renderer/components/PrimaryInput.tsx` — Main entry screen (~200 lines)
+- `src/renderer/components/ProjectTypeCard.tsx` — Visual card (~80 lines)
+- `src/renderer/components/BriefQuestionnaire.tsx` — Q&A UI (~250 lines)
+- `src/renderer/components/MCPConnectionPrompt.tsx` — MCP modal (~120 lines)
+- App.tsx modifications for new routing
+- global.d.ts updates for new IPC types
+
+**Requirements Covered:** R10
+
+### Phase 15: Conductor Refactor
+**Status:** Not Started
+**Goal:** Refactor Conductor to receive complete briefs, not raw messages.
+
+**Deliverables:**
+- Remove `classify()` method from conductor.ts
+- Add `planFromBrief(brief, capabilities)` method
+- Update planning prompt to use full brief JSON
+- Integration tests proving brief → DAG flow
+
+**Requirements Covered:** R9
+
+### Phase 16: Integration & Migration
+**Status:** Not Started
+**Goal:** Wire all components together, feature flag, end-to-end testing.
+
+**Deliverables:**
+- Feature flag (`USE_NEW_FLOW`) implementation
+- Full IPC wiring in index.ts
+- End-to-end tests for all 4 entry paths
+- Deprecation markers on send-interceptor.ts, fast-path.ts
+- Migration documentation
+
+**Requirements Covered:** R11, R12
+
+---
+
+## Phase Timing Estimates
+
+| Phase | Effort | Cumulative |
+|-------|--------|------------|
+| Phase 11: Classification | 2-3 hours | 2-3 hours |
+| Phase 12: Brief System | 3-4 hours | 5-7 hours |
+| Phase 13: Entry Router | 1-2 hours | 6-9 hours |
+| Phase 14: UI Components | 3-4 hours | 9-13 hours |
+| Phase 15: Conductor Refactor | 1-2 hours | 10-15 hours |
+| Phase 16: Integration | 2-3 hours | 12-18 hours |
+
+**Total Estimate:** 12-18 hours
 
 ---
 
