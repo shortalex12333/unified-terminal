@@ -173,16 +173,9 @@ import {
   getProgressSaver,
   cleanupProgressSaver,
   SavedProgress,
-  SavedProgressSummary,
-  DownloadOptions,
-  DownloadResult,
-  ResumeOptions,
-  ResumeResult,
   FailureReason,
-  FailureModalData,
-  FAILURE_LABELS,
-  FAILURE_DESCRIPTIONS,
   detectFailureReason,
+  getFailureReasonLabel,
 } from './failure';
 
 // Conductor System (Intelligent Routing)
@@ -217,6 +210,7 @@ import {
   MCPDetectionResult,
   MCPStatusChangeEvent,
   MCPConnectionRequiredEvent,
+  detectRequiredMCPs,
 } from './mcp';
 
 // Executors (Phase 2: Wire into step-scheduler)

@@ -39,3 +39,35 @@ export function serializeConnection(conn: MCPConnection): SerializedMCPConnectio
 export function deserializeConnection(data: SerializedMCPConnection): MCPConnection {
   return { ...data, connectedAt: new Date(data.connectedAt), expiresAt: data.expiresAt ? new Date(data.expiresAt) : undefined };
 }
+
+// Result types for IPC handlers
+export interface MCPConnectResult {
+  success: boolean;
+  connection?: MCPConnection;
+  error?: string;
+}
+
+export interface MCPDisconnectResult {
+  success: boolean;
+  error?: string;
+}
+
+export interface MCPDetectionResult {
+  required: string[];
+  missing: string[];
+  allConnected: boolean;
+}
+
+// Event types
+export interface MCPStatusChangeEvent {
+  serverId: string;
+  status: 'disconnected' | 'connecting' | 'connected' | 'error';
+  error?: string;
+}
+
+export interface MCPConnectionRequiredEvent {
+  serverId: string;
+  serverName: string;
+  reason: string;
+  stepId?: string;
+}

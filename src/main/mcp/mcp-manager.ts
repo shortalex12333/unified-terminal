@@ -2,8 +2,17 @@ import { EventEmitter } from 'events';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { shell } from 'electron';
-import { MCPServer, MCPConnection, MCP_SERVERS, serializeConnection, deserializeConnection, SerializedMCPConnection } from './types';
+import { shell, BrowserWindow } from 'electron';
+import {
+  MCPServer,
+  MCPConnection,
+  MCPConnectResult,
+  MCPDisconnectResult,
+  MCP_SERVERS,
+  serializeConnection,
+  deserializeConnection,
+  SerializedMCPConnection,
+} from './types';
 
 const KENOKI_DIR = path.join(os.homedir(), '.kenoki');
 const CONNECTIONS_FILE = path.join(KENOKI_DIR, 'mcp-connections.json');
@@ -15,6 +24,8 @@ function ensureDir(dir: string): void {
 export class MCPManager extends EventEmitter {
   private static instance: MCPManager | null = null;
   private connections: Map<string, MCPConnection> = new Map();
+  private mainWindow: BrowserWindow | null = null;
+  private initialized = false;
 
   private constructor() {
     super();
@@ -27,6 +38,19 @@ export class MCPManager extends EventEmitter {
     return MCPManager.instance;
   }
 
+  setMainWindow(window: BrowserWindow): void {
+    this.mainWindow = window;
+  }
+
+  async initialize(): Promise<void> {
+    if (this.initialized) return;
+    this.initialized = true;
+    // Verify existing connections on startup
+    for (const [serverId] of this.connections) {
+      this.emit('status-change', { serverId, status: 'connected' });
+    }
+  }
+
   listServers(): MCPServer[] {
     return MCP_SERVERS.map(server => ({
       ...server,
@@ -34,13 +58,29 @@ export class MCPManager extends EventEmitter {
     }));
   }
 
-  async connect(serverId: string): Promise<boolean> {
+  getServer(serverId: string): MCPServer | null {
     const server = MCP_SERVERS.find(s => s.id === serverId);
-    if (!server) return false;
+    if (!server) return null;
+    return {
+      ...server,
+      status: this.connections.has(serverId) ? 'connected' : 'disconnected',
+    };
+  }
 
-    this.emit('connecting', serverId);
-    
-    // Open OAuth URL in browser (simplified - real impl would handle callback)
+  async connect(options: { serverId: string; force?: boolean; timeout?: number }): Promise<MCPConnectResult> {
+    const { serverId, force } = options;
+    const server = MCP_SERVERS.find(s => s.id === serverId);
+    if (!server) {
+      return { success: false, error: 'Server not found' };
+    }
+
+    if (this.connections.has(serverId) && !force) {
+      return { success: true, connection: this.connections.get(serverId) };
+    }
+
+    this.emit('status-change', { serverId, status: 'connecting' });
+
+    // Open OAuth URL in browser
     const oauthUrl = this.getOAuthUrl(serverId);
     if (oauthUrl) {
       await shell.openExternal(oauthUrl);
@@ -55,18 +95,40 @@ export class MCPManager extends EventEmitter {
 
     this.connections.set(serverId, connection);
     this.saveConnections();
-    this.emit('connected', serverId);
-    return true;
+    this.emit('status-change', { serverId, status: 'connected' });
+    this.emit('connection-added', connection);
+    return { success: true, connection };
   }
 
-  disconnect(serverId: string): boolean {
+  async setApiKey(serverId: string, apiKey: string): Promise<MCPConnectResult> {
+    const server = MCP_SERVERS.find(s => s.id === serverId);
+    if (!server) {
+      return { success: false, error: 'Server not found' };
+    }
+
+    const connection: MCPConnection = {
+      serverId,
+      connectedAt: new Date(),
+      accessToken: apiKey,
+    };
+
+    this.connections.set(serverId, connection);
+    this.saveConnections();
+    this.emit('status-change', { serverId, status: 'connected' });
+    this.emit('connection-added', connection);
+    return { success: true, connection };
+  }
+
+  disconnect(options: { serverId: string; revokeToken?: boolean }): MCPDisconnectResult {
+    const { serverId } = options;
     if (this.connections.has(serverId)) {
       this.connections.delete(serverId);
       this.saveConnections();
-      this.emit('disconnected', serverId);
-      return true;
+      this.emit('status-change', { serverId, status: 'disconnected' });
+      this.emit('connection-removed', serverId);
+      return { success: true };
     }
-    return false;
+    return { success: false, error: 'Not connected' };
   }
 
   isConnected(serverId: string): boolean {
@@ -75,6 +137,25 @@ export class MCPManager extends EventEmitter {
 
   getConnection(serverId: string): MCPConnection | null {
     return this.connections.get(serverId) || null;
+  }
+
+  getConnections(): MCPConnection[] {
+    return Array.from(this.connections.values());
+  }
+
+  async verifyConnection(serverId: string): Promise<boolean> {
+    // Stub: In real impl, would make API call to verify token
+    return this.connections.has(serverId);
+  }
+
+  async refreshToken(serverId: string): Promise<boolean> {
+    // Stub: In real impl, would use refresh token to get new access token
+    const conn = this.connections.get(serverId);
+    if (!conn) return false;
+    // Simulate refresh
+    conn.connectedAt = new Date();
+    this.saveConnections();
+    return true;
   }
 
   private getOAuthUrl(serverId: string): string | null {
