@@ -2,8 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import StartingScreen from './StartingScreen';
 import ShowcaseScreen from './ShowcaseScreen';
 import ProfilePicker, { Provider } from './ProfilePicker';
-import ChatInterface from './ChatInterface';
-// NOTE: TerminalUI removed - Gemini shelved
+import KenokiChat from './KenokiChat';
+// NOTE: ChatInterface removed - Kenoki is now primary input
 import CircuitBreakerModal from './CircuitBreakerModal';
 import BuildPanel, { PanelState } from './BuildPanel';
 import TopBarPill from './TopBarPill';
@@ -133,7 +133,7 @@ export default function App() {
 
   const handleSelectTemplate = (prompt: string) => {
     setSelectedPrompt(prompt);
-    setScreen('select-provider');
+    setScreen('chat'); // Go directly to Kenoki chat - no provider selection needed
   };
 
   // Handler for "New Project" from ProjectList
@@ -182,7 +182,7 @@ ${context.project.description ? `Description: ${context.project.description}` : 
 ${prompt}`;
 
     setSelectedPrompt(fullPrompt);
-    setScreen('select-provider');
+    setScreen('chat'); // Go directly to Kenoki chat
   };
 
   const handleSelectProvider = (state: ProviderState) => {
@@ -334,17 +334,12 @@ ${prompt}`;
         );
 
       case 'chat':
-        if (!providerState) {
-          return <ProfilePicker onSelectProvider={handleSelectProvider} initialPrompt={selectedPrompt} />;
-        }
-
-        // NOTE: CLI provider type (Gemini) removed - shelved feature
-        // All providers now use BrowserView (ChatGPT, Claude)
+        // Kenoki is the primary input - no BrowserView, no provider selection
+        // User talks to Kenoki → Conductor → CLI tools
         return (
-          <ChatInterface
-            provider={providerState.provider}
-            onLogout={handleLogout}
+          <KenokiChat
             initialPrompt={selectedPrompt}
+            onBack={() => setScreen('showcase')}
           />
         );
 

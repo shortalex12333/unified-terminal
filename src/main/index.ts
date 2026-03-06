@@ -1543,6 +1543,71 @@ ipcMain.handle('cli:translate', async (
   return translateCleanOutput(rawOutput);
 });
 
+// ============================================================================
+// CONDUCTOR IPC HANDLERS (Primary Input → CLI Routing)
+// ============================================================================
+
+/**
+ * IPC: Send message to conductor for classification and execution.
+ * This is the primary input path for Kenoki.
+ */
+ipcMain.handle('conductor:send', async (event, message: string): Promise<void> => {
+  console.log('[IPC] conductor:send called:', message.substring(0, 50) + '...');
+  const window = BrowserWindow.fromWebContents(event.sender);
+
+  try {
+    // Notify UI that we're starting
+    window?.webContents.send('conductor:status', {
+      status: 'classifying',
+      message: 'Analyzing your request...',
+    });
+
+    // Get conductor and classify the message
+    const conductor = getConductor();
+    const plan = await conductor.classify(message);
+
+    console.log('[IPC] Conductor plan:', plan);
+
+    // Notify UI about the plan
+    window?.webContents.send('conductor:status', {
+      status: 'executing',
+      message: `Executing ${plan.plan.length} step(s)...`,
+    });
+
+    // For now, send back the plan as a response
+    // TODO: Actually execute via StepScheduler and stream results
+    const planSummary = plan.plan.map((step, i) =>
+      `${i + 1}. [${step.target}] ${step.action}: ${step.detail}`
+    ).join('\n');
+
+    window?.webContents.send('conductor:output', {
+      type: 'chunk',
+      content: `Plan created (${plan.complexity}):\n\n${planSummary}\n\n`,
+    });
+
+    // Mark complete
+    window?.webContents.send('conductor:output', {
+      type: 'complete',
+      content: '',
+    });
+
+    window?.webContents.send('conductor:status', {
+      status: 'done',
+    });
+
+  } catch (err) {
+    console.error('[IPC] conductor:send error:', err);
+    window?.webContents.send('conductor:output', {
+      type: 'error',
+      content: err instanceof Error ? err.message : String(err),
+    });
+    window?.webContents.send('conductor:status', {
+      status: 'error',
+      message: err instanceof Error ? err.message : String(err),
+    });
+  }
+});
+
 /**
  * IPC: Get simple progress status from output
  * @param rawOutput - Raw CLI output string

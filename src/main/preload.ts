@@ -2150,4 +2150,59 @@ contextBridge.exposeInMainWorld('electronAPI', {
       return ipcRenderer.invoke('dev-console:is-enabled');
     },
   },
+
+  // ============================================================================
+  // CONDUCTOR METHODS (Primary Input → CLI Routing)
+  // ============================================================================
+
+  /**
+   * Conductor API for sending user messages to CLI tools.
+   * This is the primary input path - user types in Kenoki, goes to CLI.
+   */
+  conductor: {
+    /**
+     * Send a message to the conductor for classification and execution.
+     * Message goes through: classify → plan → execute via CLI tools.
+     */
+    send: (message: string): Promise<void> => {
+      return ipcRenderer.invoke('conductor:send', message);
+    },
+
+    /**
+     * Listen for conductor output (responses from CLI tools).
+     * Streams back to the chat UI.
+     */
+    onOutput: (callback: (data: {
+      type: 'chunk' | 'complete' | 'error';
+      content: string;
+      stepId?: number;
+    }) => void): (() => void) => {
+      const handler = (_event: IpcRendererEvent, data: {
+        type: 'chunk' | 'complete' | 'error';
+        content: string;
+        stepId?: number;
+      }) => callback(data);
+      ipcRenderer.on('conductor:output', handler);
+      return () => {
+        ipcRenderer.removeListener('conductor:output', handler);
+      };
+    },
+
+    /**
+     * Listen for conductor status updates.
+     */
+    onStatus: (callback: (data: {
+      status: 'classifying' | 'planning' | 'executing' | 'done' | 'error';
+      message?: string;
+    }) => void): (() => void) => {
+      const handler = (_event: IpcRendererEvent, data: {
+        status: 'classifying' | 'planning' | 'executing' | 'done' | 'error';
+        message?: string;
+      }) => callback(data);
+      ipcRenderer.on('conductor:status', handler);
+      return () => {
+        ipcRenderer.removeListener('conductor:status', handler);
+      };
+    },
+  },
 });
