@@ -8,7 +8,10 @@
     "dev": "vite"
   },
   "dependencies": {
+    "@splinetool/react-spline": "^4.1.0",
+    "@splinetool/runtime": "^1.12.67",
     "lucide-react": "0.487.0",
+    "motion": "^12.35.0",
     "react": "18.3.1",
     "react-dom": "18.3.1"
   },
@@ -18,7 +21,6 @@
     "tailwindcss": "4.1.12",
     "vite": "6.3.5"
   },
-  "peerDependencies": {},
   "peerDependenciesMeta": {},
   "pnpm": {
     "overrides": {
