@@ -44,8 +44,8 @@ export default function Hero() {
         }}
       />
 
-      {/* Text overlay */}
-      <div className="relative z-10 flex flex-col items-center text-center">
+      {/* Text overlay — no z-index so mix-blend-mode can composite against Spline canvas */}
+      <div className="relative flex flex-col items-center text-center">
         {/* Blend-mode wrapper — only around the heading */}
         <div style={{ mixBlendMode: 'difference' }}>
           <h1
@@ -74,10 +74,10 @@ export default function Hero() {
           </h1>
         </div>
 
-        {/* CTA group */}
+        {/* CTA group — z-10 so button stays clickable above Spline */}
         <motion.div
           className="flex flex-col items-center"
-          style={{ marginTop: 44 }}
+          style={{ marginTop: 44, position: 'relative', zIndex: 10 }}
           initial={{ opacity: 0, y: 16 }}
           animate={ctaVisible ? { opacity: 1, y: 0 } : {}}
           transition={{ duration: 0.6, ease: EASE_OUT_EXPO }}

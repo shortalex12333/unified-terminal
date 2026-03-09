@@ -41,9 +41,10 @@ export default function FinalCTA() {
 
       <div
         ref={contentRef}
-        className="relative z-10 flex flex-col items-center text-center gap-8"
+        className="relative flex flex-col items-center text-center"
+        style={{ gap: 32 }}
       >
-        {/* Kenoki wordmark */}
+        {/* Kenoki wordmark — no z-index on parent so blend mode composites against Spline */}
         <div style={{ mixBlendMode: 'difference' }}>
           <h2
             className="font-bumbled"
@@ -75,9 +76,11 @@ export default function FinalCTA() {
           From idea to live link.
         </p>
 
-        {/* Download button */}
+        {/* Download button — z-10 so it stays clickable above Spline */}
         <div
           style={{
+            position: 'relative',
+            zIndex: 10,
             opacity: inView ? 1 : 0,
             transform: inView ? 'translateY(0)' : 'translateY(16px)',
             transition: 'opacity 0.7s var(--ease-out-expo) 0.24s, transform 0.7s var(--ease-out-expo) 0.24s',
@@ -108,8 +111,11 @@ export default function FinalCTA() {
 
         {/* Footer links */}
         <nav
-          className="flex flex-wrap justify-center gap-8 mt-16"
+          className="flex flex-wrap justify-center mt-16"
           style={{
+            gap: 32,
+            position: 'relative',
+            zIndex: 10,
             opacity: inView ? 1 : 0,
             transition: 'opacity 0.7s var(--ease-out-expo) 0.44s',
           }}

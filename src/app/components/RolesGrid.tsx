@@ -149,7 +149,8 @@ export default function RolesGrid() {
 
       <div
         ref={gridRef}
-        className="relative z-10 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-5"
+        className="relative z-10 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6"
+        style={{ gap: 20 }}
         onMouseMove={handleMouseMove}
         onMouseLeave={handleMouseLeave}
       >

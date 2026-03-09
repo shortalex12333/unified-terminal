@@ -36,7 +36,7 @@ export default function FAQSection() {
         Questions you're thinking
       </h2>
 
-      <div className="flex flex-col gap-5">
+      <div className="flex flex-col" style={{ gap: 20 }}>
         {faqData.map((item: FAQItem, i: number) => {
           const isOpen = openIndex === i
           return (

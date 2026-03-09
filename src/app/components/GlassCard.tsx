@@ -20,8 +20,7 @@ const GlassCard = forwardRef<HTMLDivElement, GlassCardProps>(
         padding,
         boxShadow: '0 8px 32px rgba(100,120,160,0.1), 0 2px 6px rgba(0,0,0,0.05), inset 0 1.5px 0 rgba(255,255,255,1), inset 0 -1px 0 rgba(255,255,255,0.5)',
         position: 'relative',
-        overflow: 'hidden',
-        ...(fixedHeight ? { height: 420 } : {}),
+        ...(fixedHeight ? { minHeight: 420 } : {}),
         ...style,
       }}
       onClick={onClick}
@@ -45,7 +44,7 @@ const GlassCard = forwardRef<HTMLDivElement, GlassCardProps>(
         }}
       />
       {/* Content */}
-      <div className="relative z-10" style={{ height: '100%' }}>
+      <div className="relative z-10">
         {children}
       </div>
       {/* Bottom inner glow */}

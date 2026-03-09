@@ -85,7 +85,7 @@ export default function Scrollytelling() {
         </div>
 
         {/* Two-column layout */}
-        <div className="max-w-[1100px] w-full px-8 lg:px-12 grid grid-cols-1 md:grid-cols-2 gap-20 mt-[6vh] items-start relative z-10">
+        <div className="max-w-[1100px] w-full px-8 lg:px-12 grid grid-cols-1 md:grid-cols-2 mt-[6vh] items-start relative z-10" style={{ gap: 80 }}>
           {/* Left column */}
           <div className="flex flex-col relative">
             <p className="text-[12px] uppercase tracking-[0.15em] text-[var(--text-faint)] font-semibold mb-8 text-center font-poppins">
@@ -106,7 +106,7 @@ export default function Scrollytelling() {
             </div>
 
             {/* Card content with AnimatePresence crossfade */}
-            <div className="relative z-10" style={{ height: 420 }}>
+            <div className="relative z-10">
               <AnimatePresence mode="popLayout">
                 <motion.div
                   key={frame}
@@ -114,7 +114,6 @@ export default function Scrollytelling() {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -12 }}
                   transition={{ duration: 0.5 }}
-                  className="absolute inset-0"
                 >
                   <UserView data={FRAMES[frame - 1]?.left} progress={1} />
                 </motion.div>

@@ -54,7 +54,7 @@ function StatusView({ data }: { data: Extract<FrameLeft, { type: 'status' }>; pr
     <GlassCard hover={false} fixedHeight className="flex items-center justify-center text-center">
       <div className="flex flex-col items-center">
         <IconComponent size={48} className="text-[var(--text-secondary)] mb-6" strokeWidth={1} />
-        <div className="flex items-center gap-3 mb-2">
+        <div className="flex items-center mb-2" style={{ gap: 12 }}>
           <h3 className="text-[var(--text-primary)] text-xl font-medium font-eloquia" style={textGlow}>
             {data.title}
           </h3>
@@ -73,11 +73,12 @@ function QuizView({ data }: { data: Extract<FrameLeft, { type: 'quiz' }>; progre
       <h3 className="text-[var(--text-primary)] text-xl font-medium font-eloquia mb-6" style={textGlow}>
         {data.title}
       </h3>
-      <div className="space-y-5">
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         {data.questions.map((q, i) => (
           <div
             key={i}
-            className="flex items-center gap-4 bg-[var(--glass-bg)] border border-[var(--border-subtle)] rounded-[16px] p-4 shadow-[0_4px_12px_rgba(0,0,0,0.06)] backdrop-blur-md"
+            className="flex items-center bg-[var(--glass-bg)] border border-[var(--border-subtle)] rounded-[16px] p-4 shadow-[0_4px_12px_rgba(0,0,0,0.06)] backdrop-blur-md"
+            style={{ gap: 16 }}
           >
             <div className="w-8 h-8 rounded-full bg-[#ACCBEE]/10 border border-[#ACCBEE]/20 flex items-center justify-center text-[#ACCBEE] shadow-[inset_0_2px_4px_rgba(255,255,255,0.05)]">
               <HelpCircle size={16} strokeWidth={2} />
@@ -98,16 +99,17 @@ function PlanView({ data }: { data: Extract<FrameLeft, { type: 'plan' }>; progre
       <h3 className="text-[var(--text-primary)] text-[26px] font-light font-eloquia mb-6 tracking-tight" style={textGlow}>
         {data.title}
       </h3>
-      <div className="space-y-4">
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         {data.steps.map((step, i) => {
           const StepIcon = PlanIcons[step.icon]
           const isHighlighted = i === 2
           return (
             <div
               key={i}
-              className={`flex items-center gap-3 px-3 py-1.5 rounded-lg transition-colors ${
+              className={`flex items-center px-3 py-1.5 rounded-lg transition-colors ${
                 isHighlighted ? 'border-l-[2px] border-[#ACCBEE] bg-[var(--glass-bg)] shadow-[inset_0_0_12px_rgba(172,203,238,0.05)]' : ''
               }`}
+              style={{ gap: 12 }}
             >
               <span className="w-6 flex justify-center text-[var(--text-secondary)]">
                 {StepIcon ? <StepIcon size={16} /> : null}
@@ -131,9 +133,9 @@ function ProgressView({ data }: { data: Extract<FrameLeft, { type: 'progress' }>
       <h3 className="text-[var(--text-primary)] text-xl font-medium font-eloquia mb-5" style={textGlow}>
         {data.title}
       </h3>
-      <div className="space-y-4">
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         {data.items.map((item, i) => (
-          <div key={i} className="flex items-center gap-4">
+          <div key={i} className="flex items-center" style={{ gap: 16 }}>
             <div className="w-5 flex justify-center">
               {item.state === 'done' && (
                 <CheckCircle2
@@ -174,7 +176,7 @@ function ParallelView({ data }: { data: Extract<FrameLeft, { type: 'parallel' }>
       <h3 className="text-[var(--text-primary)] text-xl font-medium font-eloquia mb-6" style={textGlow}>
         {data.title}
       </h3>
-      <div className="space-y-6">
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
         {data.tracks.map((bar, i) => (
           <div key={i}>
             <div className="flex justify-between text-[14px] mb-3">
@@ -201,14 +203,14 @@ function ConnectView({ data }: { data: Extract<FrameLeft, { type: 'connect' }>; 
   return (
     <GlassCard hover={false} fixedHeight>
       <div className="flex flex-col h-full">
-        <div className="inline-flex items-center self-start gap-2 px-3 py-1.5 bg-[var(--glass-bg)] rounded-full text-[12px] font-medium text-[var(--text-secondary)] mb-6 border border-[var(--border-subtle)]">
+        <div className="inline-flex items-center self-start px-3 py-1.5 bg-[var(--glass-bg)] rounded-full text-[12px] font-medium text-[var(--text-secondary)] mb-6 border border-[var(--border-subtle)]" style={{ gap: 8 }}>
           <CreditCard size={14} /> {data.service}
         </div>
         <h3 className="text-[var(--text-primary)] text-[26px] font-light font-eloquia mb-3 tracking-tight" style={textGlow}>
           {data.title}
         </h3>
         <p className="text-[var(--text-secondary)] text-[14.5px] mb-6 leading-relaxed">{data.message}</p>
-        <div className="flex gap-3 mt-auto">
+        <div className="flex mt-auto" style={{ gap: 12 }}>
           <button className="flex-1 btn-primary py-3.5 text-[14px] font-medium font-poppins">
             {data.buttons[0]}
           </button>
@@ -228,9 +230,9 @@ function ChecksView({ data }: { data: Extract<FrameLeft, { type: 'checks' }>; pr
       <h3 className="text-[var(--text-primary)] text-xl font-medium font-eloquia mb-5" style={textGlow}>
         {data.title}
       </h3>
-      <div className="space-y-5">
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         {data.checks.map((check, i) => (
-          <div key={i} className="flex items-center gap-4">
+          <div key={i} className="flex items-center" style={{ gap: 16 }}>
             <div className="w-[22px] h-[22px] rounded-full bg-[#7ED9B5]/15 border border-[#7ED9B5]/30 flex items-center justify-center text-[#7ED9B5] shadow-[0_0_10px_rgba(126,217,181,0.2)]">
               <Check size={13} strokeWidth={3} />
             </div>
@@ -249,11 +251,11 @@ function InterruptView({ data }: { data: Extract<FrameLeft, { type: 'interrupt' 
     'bg-[var(--glass-bg)] backdrop-blur-[40px] border border-[var(--border-subtle)] rounded-[24px] p-6 shadow-[0_8px_32px_rgba(0,0,0,0.08)] w-full relative overflow-hidden'
 
   return (
-    <div className="flex flex-col gap-5 relative" style={{ height: 420 }}>
+    <div className="flex flex-col relative" style={{ minHeight: 420, gap: 20 }}>
       {/* User message */}
       <div className={`${cardBase}`}>
         <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-white/[0.8] to-transparent pointer-events-none" />
-        <div className="flex items-start gap-4 relative z-10">
+        <div className="flex items-start relative z-10" style={{ gap: 16 }}>
           <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#C7A6D8] via-[#EAA7B6] to-[#F1A8A6] flex-shrink-0 shadow-[0_0_15px_rgba(217,166,199,0.3)]" />
           <div className="pt-0.5">
             <p className="text-[var(--text-primary)] text-[13px] font-semibold">You</p>
@@ -272,15 +274,16 @@ function InterruptView({ data }: { data: Extract<FrameLeft, { type: 'interrupt' 
           <h3 className="text-[var(--text-primary)] text-[16px] font-medium mb-6 font-eloquia" style={textGlow}>
             {data.result.message}
           </h3>
-          <div className="flex flex-col gap-3">
-            <div className="inline-flex items-center gap-2.5 px-3 py-2 bg-[#F08A8A]/10 border border-[#F08A8A]/30 text-[#F08A8A] rounded-full text-[13px] font-medium self-start shadow-[0_0_15px_rgba(240,138,138,0.15)]">
+          <div className="flex flex-col" style={{ gap: 12 }}>
+            <div className="inline-flex items-center px-3 py-2 bg-[#F08A8A]/10 border border-[#F08A8A]/30 text-[#F08A8A] rounded-full text-[13px] font-medium self-start shadow-[0_0_15px_rgba(240,138,138,0.15)]" style={{ gap: 10 }}>
               <div className="w-1.5 h-1.5 rounded-full bg-[#F08A8A] drop-shadow-[0_0_4px_rgba(240,138,138,1)]" />
               Canceled: {data.result.affected}
             </div>
             {data.result.unaffected.map((name, i) => (
               <div
                 key={i}
-                className="inline-flex items-center gap-2.5 px-3 py-2 bg-[#7ED9B5]/10 border border-[#7ED9B5]/30 text-[#7ED9B5] rounded-full text-[13px] font-medium self-start shadow-[0_0_15px_rgba(126,217,181,0.1)]"
+                className="inline-flex items-center px-3 py-2 bg-[#7ED9B5]/10 border border-[#7ED9B5]/30 text-[#7ED9B5] rounded-full text-[13px] font-medium self-start shadow-[0_0_15px_rgba(126,217,181,0.1)]"
+                style={{ gap: 10 }}
               >
                 <div className="w-1.5 h-1.5 rounded-full bg-[#7ED9B5]" />
                 Unchanged: {name}
@@ -310,13 +313,14 @@ function LiveView({ data }: { data: Extract<FrameLeft, { type: 'live' }>; progre
         </h3>
         <a
           href="#"
-          className="inline-flex items-center gap-2 text-[13px] font-medium text-[#ACCBEE] hover:text-[#C7A6D8] transition-colors bg-[var(--glass-bg)] px-4 py-2 rounded-full border border-[var(--border-subtle)] backdrop-blur-sm"
+          className="inline-flex items-center text-[13px] font-medium text-[#ACCBEE] hover:text-[#C7A6D8] transition-colors bg-[var(--glass-bg)] px-4 py-2 rounded-full border border-[var(--border-subtle)] backdrop-blur-sm"
+          style={{ gap: 8 }}
         >
           <LinkIcon size={14} />
           {data.url}
         </a>
       </div>
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-3" style={{ gap: 16 }}>
         {data.stats.map((stat, i) => (
           <div
             key={i}
